@@ -86,6 +86,23 @@ public:
   {
     LinearStrategyModule<TContext>::Reset();
   }
+  template <typename T, typename TContext>
+  [[nodiscard]] TypedHandle<T> AllocateWithHandle(size_t Count = 1) noexcept
+    requires(TContext::SupportHandles)
+  {
+
+    size_t totalSize = sizeof(T) * Count;
+    void* ptr = Allocate<TContext>(totalSize, alignof(T));
+
+    if (ptr == nullptr)
+      return TypedHandle<T>(INVALID_HANDLE);
+
+    Handle handle = m_HandleTable.Allocate(ptr);
+    if (!handle.IsValid())
+      return TypedHandle<T>(INVALID_HANDLE);
+
+    return TypedHandle<T>(handle);
+  }
 
   template <typename T, typename TContext>
   [[nodiscard]] TypedHandle<T> AllocateWithHandle(size_t Count = 1) noexcept {

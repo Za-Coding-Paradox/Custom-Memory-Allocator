@@ -14,7 +14,7 @@
 [ RUN      ] AllocatorTest.Multithreaded_Allocation_Stress
 [       OK ] AllocatorTest.Multithreaded_Allocation_Stress (0 ms)
 [ RUN      ] AllocatorTest.Advanced_Alignment_Strictness_AVX
-0x7f7896c10080[       OK ] AllocatorTest.Advanced_Alignment_Strictness_AVX (0 ms)
+0x7f627da10080[       OK ] AllocatorTest.Advanced_Alignment_Strictness_AVX (0 ms)
 [ RUN      ] AllocatorTest.Advanced_Slab_Boundary_Crossing
 [       OK ] AllocatorTest.Advanced_Slab_Boundary_Crossing (0 ms)
 [ RUN      ] AllocatorTest.Advanced_Rewind_And_Overwrite
@@ -23,8 +23,8 @@
 [       OK ] AllocatorTest.Advanced_Handle_Data_Integrity (0 ms)
 [ RUN      ] AllocatorTest.Advanced_Chaos_Monkey
 [       OK ] AllocatorTest.Advanced_Chaos_Monkey (0 ms)
-[----------] 11 tests from AllocatorTest (4 ms total)
+[----------] 11 tests from AllocatorTest (3 ms total)
 
 [----------] Global test environment tear-down
-[==========] 11 tests from 1 test suite ran. (4 ms total)
+[==========] 11 tests from 1 test suite ran. (3 ms total)
 [  PASSED  ] 11 tests.
