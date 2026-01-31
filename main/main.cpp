@@ -137,20 +137,20 @@ TEST_F(AllocatorTest, Handle_Lifecycle) {
 }
 
 TEST_F(AllocatorTest, Scoped_Marker_Rewind) {
-  // Save State
+  // Save State of LevelLoad
   auto checkpoint = Engine->SaveState<LevelLoad>();
 
-  // Allocate temp data
-  int* temp = (int*)Engine->Allocate<FrameLoad>(sizeof(int));
+  // FIX: Allocate on LevelLoad (so the pointer we saved gets advanced)
+  int* temp = (int*)Engine->Allocate<LevelLoad>(sizeof(int));
   *temp = 999;
-  uintptr_t addrOriginal = reinterpret_cast<uintptr_t>(temp); // NOLINT
+  uintptr_t addrOriginal = reinterpret_cast<uintptr_t>(temp);
 
-  // Restore (Rewind)
+  // Restore (Rewind) LevelLoad pointer back to checkpoint
   Engine->RestoreState<LevelLoad>(checkpoint.first, checkpoint.second);
 
-  // Allocate again - should reuse exactly the same memory address
-  int* reused = (int*)Engine->Allocate<FrameLoad>(sizeof(int));
-  uintptr_t addrNew = reinterpret_cast<uintptr_t>(reused); // NOLINT
+  // FIX: Allocate on LevelLoad again (should now be back at the start)
+  int* reused = (int*)Engine->Allocate<LevelLoad>(sizeof(int));
+  uintptr_t addrNew = reinterpret_cast<uintptr_t>(reused);
 
   EXPECT_EQ(addrOriginal, addrNew);
 }
@@ -227,28 +227,28 @@ TEST_F(AllocatorTest, Advanced_Slab_Boundary_Crossing) {
 }
 
 TEST_F(AllocatorTest, Advanced_Rewind_And_Overwrite) {
-  // 1. Save
+  // 1. Save LevelLoad
   auto ckpt = Engine->SaveState<LevelLoad>();
 
-  // 2. Write Garbage
+  // 2. Write Garbage (FIX: Use LevelLoad)
   struct Data {
     int val[10];
   };
-  Data* garbage = (Data*)Engine->Allocate<FrameLoad>(sizeof(Data));
+  Data* garbage = (Data*)Engine->Allocate<LevelLoad>(sizeof(Data));
   garbage->val[0] = 0xDEADBEEF;
-  uintptr_t addrGarbage = reinterpret_cast<uintptr_t>(garbage); // NOLINT
+  uintptr_t addrGarbage = reinterpret_cast<uintptr_t>(garbage);
 
-  // 3. Rewind
+  // 3. Rewind LevelLoad
   Engine->RestoreState<LevelLoad>(ckpt.first, ckpt.second);
 
-  // 4. Write Gold
-  Data* gold = (Data*)Engine->Allocate<FrameLoad>(sizeof(Data));
+  // 4. Write Gold (FIX: Use LevelLoad)
+  Data* gold = (Data*)Engine->Allocate<LevelLoad>(sizeof(Data));
   gold->val[0] = 0x11111111;
-  uintptr_t addrGold = reinterpret_cast<uintptr_t>(gold); // NOLINT
+  uintptr_t addrGold = reinterpret_cast<uintptr_t>(gold);
 
   // 5. Verify
-  EXPECT_EQ(addrGold, addrGarbage);    // Must be same address
-  EXPECT_EQ(gold->val[0], 0x11111111); // Must have new data
+  EXPECT_EQ(addrGold, addrGarbage);    // Addresses should match
+  EXPECT_EQ(gold->val[0], 0x11111111); // Data should be overwritten
 }
 
 TEST_F(AllocatorTest, Advanced_Handle_Data_Integrity) {

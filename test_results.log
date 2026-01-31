@@ -1,0 +1,30 @@
+[==========] Running 11 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 11 tests from AllocatorTest
+[ RUN      ] AllocatorTest.Basic_Allocation_And_Alignment
+[       OK ] AllocatorTest.Basic_Allocation_And_Alignment (0 ms)
+[ RUN      ] AllocatorTest.Oversized_Allocation_Rejection
+[       OK ] AllocatorTest.Oversized_Allocation_Rejection (0 ms)
+[ RUN      ] AllocatorTest.Zombie_Chain_Leak_Stress_Test
+[       OK ] AllocatorTest.Zombie_Chain_Leak_Stress_Test (0 ms)
+[ RUN      ] AllocatorTest.Handle_Lifecycle
+[       OK ] AllocatorTest.Handle_Lifecycle (0 ms)
+[ RUN      ] AllocatorTest.Scoped_Marker_Rewind
+[       OK ] AllocatorTest.Scoped_Marker_Rewind (0 ms)
+[ RUN      ] AllocatorTest.Multithreaded_Allocation_Stress
+[       OK ] AllocatorTest.Multithreaded_Allocation_Stress (0 ms)
+[ RUN      ] AllocatorTest.Advanced_Alignment_Strictness_AVX
+0x7f7896c10080[       OK ] AllocatorTest.Advanced_Alignment_Strictness_AVX (0 ms)
+[ RUN      ] AllocatorTest.Advanced_Slab_Boundary_Crossing
+[       OK ] AllocatorTest.Advanced_Slab_Boundary_Crossing (0 ms)
+[ RUN      ] AllocatorTest.Advanced_Rewind_And_Overwrite
+[       OK ] AllocatorTest.Advanced_Rewind_And_Overwrite (0 ms)
+[ RUN      ] AllocatorTest.Advanced_Handle_Data_Integrity
+[       OK ] AllocatorTest.Advanced_Handle_Data_Integrity (0 ms)
+[ RUN      ] AllocatorTest.Advanced_Chaos_Monkey
+[       OK ] AllocatorTest.Advanced_Chaos_Monkey (0 ms)
+[----------] 11 tests from AllocatorTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 11 tests from 1 test suite ran. (4 ms total)
+[  PASSED  ] 11 tests.

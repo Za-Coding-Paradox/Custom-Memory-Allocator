@@ -151,12 +151,36 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
   LOG_ALLOCATOR("DEBUG", "LinearModule: Rewinding State.");
 
   if (!SavedSlab) {
+
+    SlabDescriptor* current = g_HeadSlab;
+    while (current != nullptr) {
+      SlabDescriptor* next = current->GetNextSlab();
+
+      if (g_SlabRegistry) {
+        g_SlabRegistry->FreeSlab(current);
+      }
+      current = next;
+    }
+
+    g_HeadSlab = nullptr;
     g_ActiveSlab = nullptr;
     return;
   }
 
-  g_ActiveSlab = SavedSlab;
+  SlabDescriptor* victim = SavedSlab->GetNextSlab();
+  SavedSlab->SetNextSlab(nullptr);
 
+  while (victim != nullptr) {
+    SlabDescriptor* nextVictim = victim->GetNextSlab();
+
+    if (g_SlabRegistry) {
+      g_SlabRegistry->FreeSlab(victim);
+    }
+
+    victim = nextVictim;
+  }
+
+  g_ActiveSlab = SavedSlab;
   LinearStrategy::RewindToMarker(*g_ActiveSlab, SavedOffset);
 }
 
