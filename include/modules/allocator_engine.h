@@ -7,9 +7,6 @@ namespace Allocator {
 
 static size_t g_AllocatorEngineBaseAlignment = 16;
 
-// ============================================================================
-// Strategy Interface
-// ============================================================================
 class IAllocationStrategy {
 public:
   virtual ~IAllocationStrategy() noexcept = default;
@@ -27,9 +24,6 @@ public:
   virtual size_t GetAllocationCount() const noexcept = 0;
 };
 
-// ============================================================================
-// Context & Stats
-// ============================================================================
 enum class AllocatorContextType : uint8_t { Frame, Level, Global, Temporary, Persistent };
 
 struct AllocationStats {
@@ -39,7 +33,6 @@ struct AllocationStats {
   std::atomic<size_t> FreeCount{0};
   std::atomic<size_t> ResetCount{0};
 
-  // Definitions moved to .cpp
   void RecordAllocation(size_t Size) noexcept;
   void RecordFree(size_t Size) noexcept;
   void RecordReset() noexcept;
@@ -48,9 +41,6 @@ struct AllocationStats {
   void Publish(size_t LocalAllocated, size_t LocalPeak, size_t LocalCount) noexcept;
 };
 
-// ============================================================================
-// Allocator Engine
-// ============================================================================
 class AllocatorEngine {
 private:
   SlabRegistry m_Registry;
@@ -73,15 +63,8 @@ public:
   AllocatorEngine(AllocatorEngine&&) = delete;
   AllocatorEngine& operator=(AllocatorEngine&&) = delete;
 
-  // Core Lifecycle (Moved to .cpp)
   void Initialize() noexcept;
   void Shutdown() noexcept;
-
-  // ========================================================================
-  // TEMPLATE API (MUST REMAIN IN HEADER)
-  // ========================================================================
-
-  // Inside AllocatorEngine Class
 
   template <typename TContext>
   [[nodiscard]] void* Allocate(size_t Size,
@@ -94,8 +77,6 @@ public:
       return nullptr;
     }
 
-    // [FIX] Removed m_ContextStats update from here.
-    // It is now handled internally by LinearStrategyModule.
     return LinearStrategyModule<TContext>::Allocate(Size, Alignment);
   }
 
@@ -104,12 +85,7 @@ public:
     requires(!TContext::IsRewindable)
   {
     LinearStrategyModule<TContext>::Reset();
-    // [FIX] Removed m_ContextStats update from here.
   }
-
-  // ========================================================================
-  // Handle API (Templates MUST remain in header)
-  // ========================================================================
 
   template <typename T, typename TContext>
   [[nodiscard]] TypedHandle<T> AllocateWithHandle(size_t Count = 1) noexcept {
@@ -134,10 +110,6 @@ public:
     return m_HandleTable.Free(Handle.GetHandle());
   }
 
-  // ========================================================================
-  // Rewind Support
-  // ========================================================================
-
   template <typename TContext>
   [[nodiscard]] std::pair<SlabDescriptor*, uintptr_t> SaveState() noexcept
     requires(TContext::IsRewindable)
@@ -152,9 +124,6 @@ public:
     LinearStrategyModule<TContext>::RewindState(Slab, Offset);
   }
 
-  // ========================================================================
-  // Scoped Allocation (RAII)
-  // ========================================================================
   template <typename T, typename TContext> class ScopedAllocation {
   private:
     AllocatorEngine& m_Engine;
@@ -169,7 +138,6 @@ public:
         m_Engine.FreeHandle(m_Handle);
     }
 
-    // Non-copyable
     ScopedAllocation(const ScopedAllocation&) = delete;
     ScopedAllocation& operator=(const ScopedAllocation&) = delete;
 
@@ -189,9 +157,6 @@ public:
     return ScopedAllocation<T, TContext>(*this, Count);
   }
 
-  // ========================================================================
-  // Stats & Accessors (Moved to .cpp)
-  // ========================================================================
   [[nodiscard]] const AllocationStats& GetStats(AllocatorContextType Context) const noexcept;
   [[nodiscard]] size_t GetTotalAllocated() const noexcept;
   [[nodiscard]] size_t GetPeakAllocated() const noexcept;
@@ -206,7 +171,6 @@ public:
   [[nodiscard]] bool IsInitialized() const noexcept;
 
 private:
-  // Helper mapping (Must be in header as it's used by templates)
   template <typename TContext> [[nodiscard]] static AllocatorContextType GetContextType() noexcept {
     if constexpr (std::is_same_v<TContext, FrameLoad>)
       return AllocatorContextType::Frame;
@@ -217,7 +181,6 @@ private:
     return AllocatorContextType::Frame;
   }
 
-  // Moved to .cpp
   [[nodiscard]] static const char* GetContextName(AllocatorContextType Type) noexcept;
 };
 
