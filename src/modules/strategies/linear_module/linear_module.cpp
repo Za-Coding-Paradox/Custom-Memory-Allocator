@@ -98,7 +98,9 @@ void LinearStrategyModule<TContext>::Reset() noexcept
 {
   if (static_cast<bool>(g_HeadSlab)) {
     LOG_ALLOCATOR("DEBUG", "LinearModule: Frame Reset (Lazy).");
+    SlabDescriptor* NextSlab = g_HeadSlab->GetNextSlab();
     LinearStrategy::Reset(*g_HeadSlab);
+    g_HeadSlab->SetNextSlab(NextSlab);
     g_ActiveSlab = g_HeadSlab;
   }
 }
