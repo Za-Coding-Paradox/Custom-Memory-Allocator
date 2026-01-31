@@ -4,19 +4,19 @@
 
 namespace Allocator {
 
-// FIX (Bug #2 and original namespace issue): Changed from namespace to struct
-// Templates require TYPES as arguments, not namespaces
-
 struct FrameLoad {
   static constexpr bool IsRewindable = false;
+  static constexpr bool SupportsHandles = false;
 };
 
 struct LevelLoad {
   static constexpr bool IsRewindable = true;
+  static constexpr bool SupportsHandles = false;
 };
 
 struct GlobalLoad {
   static constexpr bool IsRewindable = true;
+  static constexpr bool SupportsHandles = false;
 };
 
 } // namespace Allocator
