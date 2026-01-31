@@ -1,0 +1,41 @@
+---
+# Enable checks for:
+# - Bugprone: Common bugs (use-after-free, narrowing conversions, etc.)
+# - Modernize: Suggests C++20 features (auto, nullptr, override, etc.)
+# - Performance: Unnecessary copies, expensive loops
+# - Readability: Naming conventions, clarity
+# - Clang-Analyzer: Deep static analysis
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  misc-*,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -llvmlibc-*
+
+# header-filter regex to ensure it checks your source files but ignores system libs
+HeaderFilterRegex: 'src/.*|include/.*'
+
+CheckOptions:
+  # Enforce variable naming (camelBack)
+  - key:             readability-identifier-naming.VariableCase
+    value:           camelBack
+  # Enforce function naming (CamelCase)
+  - key:             readability-identifier-naming.FunctionCase
+    value:           CamelCase
+  # Enforce private member naming (m_ prefix is common, or just camelBack_)
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           _
+  - key:             readability-identifier-naming.StructCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.ClassCase
+    value:           CamelCase
+  # Modernize: reasonable complexity limits
+  - key:             readability-function-cognitive-complexity.Threshold
+    value:           25
+...

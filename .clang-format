@@ -1,0 +1,40 @@
+---
+Language:        Cpp
+# BasedOnStyle:  LLVM
+
+# --- Indentation & Spacing ---
+AccessModifierOffset: -2
+IndentWidth:     2
+TabWidth:        2
+UseTab:          Never
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+
+# --- Brace Wrapping ---
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# --- Line Breaking ---
+ColumnLimit:     100  # Increased slightly from 80 for modern C++ verbosity
+BinPackArguments: true
+BinPackParameters: true
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+
+# --- C++20/Modern Features ---
+Standard:        c++20
+IndentRequiresClause: true
+BreakBeforeConceptDeclarations: true
+CompactNamespaces: false
+FixNamespaceComments: true
+
+# --- Pointers & References ---
+PointerAlignment: Left # 'int* p' vs 'int *p'. LLVM uses Right.
+DerivePointerAlignment: false
+
+# --- Includes ---
+SortIncludes:    CaseSensitive
+IncludeBlocks:   Regroup
+...
