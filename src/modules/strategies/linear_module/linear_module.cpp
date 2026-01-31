@@ -149,7 +149,14 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
   requires(TContext::IsRewindable)
 {
   LOG_ALLOCATOR("DEBUG", "LinearModule: Rewinding State.");
+
+  if (!SavedSlab) {
+    g_ActiveSlab = nullptr;
+    return;
+  }
+
   g_ActiveSlab = SavedSlab;
+
   LinearStrategy::RewindToMarker(*g_ActiveSlab, SavedOffset);
 }
 
