@@ -3,33 +3,28 @@
 namespace Allocator {
 
 template <typename TContext>
-thread_local SlabDescriptor *LinearStrategyModule<TContext>::g_HeadSlab =
-    nullptr;
+thread_local SlabDescriptor* LinearStrategyModule<TContext>::g_HeadSlab = nullptr;
 
 template <typename TContext>
-thread_local SlabDescriptor *LinearStrategyModule<TContext>::g_ActiveSlab =
-    nullptr;
+thread_local SlabDescriptor* LinearStrategyModule<TContext>::g_ActiveSlab = nullptr;
 
 // FIX (Bug #14): Thread-local cleanup guard
 template <typename TContext>
-thread_local LinearModuleThreadGuard<TContext>
-    LinearStrategyModule<TContext>::g_ThreadGuard;
+thread_local LinearModuleThreadGuard<TContext> LinearStrategyModule<TContext>::g_ThreadGuard;
 
 template <typename TContext>
-void LinearStrategyModule<TContext>::InitializeModule(
-    SlabRegistry *RegistryInstance) noexcept {
+void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept {
   LOG_ALLOCATOR("INFO", "LinearModule: Initialized.");
   g_SlabRegistry = RegistryInstance;
 }
 
-template <typename TContext>
-void LinearStrategyModule<TContext>::ShutdownModule() noexcept {
+template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept {
   LOG_ALLOCATOR("INFO", "LinearModule: Shutting down...");
   size_t FreedCount = 0;
 
-  SlabDescriptor *Current = g_HeadSlab;
+  SlabDescriptor* Current = g_HeadSlab;
   while (static_cast<bool>(Current)) {
-    SlabDescriptor *Next = Current->GetNextSlab();
+    SlabDescriptor* Next = Current->GetNextSlab();
     g_SlabRegistry->FreeSlab(Current);
     Current = Next;
     FreedCount++;
@@ -38,30 +33,33 @@ void LinearStrategyModule<TContext>::ShutdownModule() noexcept {
   g_HeadSlab = nullptr;
   g_ActiveSlab = nullptr;
 
-  LOG_ALLOCATOR("INFO",
-                "LinearModule: Shutdown Complete. Freed Slabs: " << FreedCount);
+  LOG_ALLOCATOR("INFO", "LinearModule: Shutdown Complete. Freed Slabs: " << FreedCount);
 }
 
 template <typename TContext>
-void *
-LinearStrategyModule<TContext>::Allocate(size_t AllocationSize,
-                                         size_t AllocationAlignment) noexcept {
+void* LinearStrategyModule<TContext>::Allocate(size_t AllocationSize,
+                                               size_t AllocationAlignment) noexcept {
+
+  if (AllocationSize > g_ConstSlabSize) [[unlikely]] {
+    LOG_ALLOCATOR("ERROR", "Allocation too large for slab architecture!");
+    return nullptr;
+  }
+
   if (!static_cast<bool>(g_ActiveSlab)) [[unlikely]] {
     GrowSlabChain();
   }
 
   if (LinearStrategy::CanFit(*g_ActiveSlab, AllocationSize)) {
-    return LinearStrategy::Allocate(*g_ActiveSlab, AllocationSize,
-                                    AllocationAlignment);
+    return LinearStrategy::Allocate(*g_ActiveSlab, AllocationSize, AllocationAlignment);
   }
 
   return OverFlowAllocate(AllocationSize, AllocationAlignment);
 }
 
 template <typename TContext>
-void *LinearStrategyModule<TContext>::OverFlowAllocate(
-    size_t AllocationSize, size_t AllocationAlignment) noexcept {
-  SlabDescriptor *NextSlab = g_ActiveSlab->GetNextSlab();
+void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
+                                                       size_t AllocationAlignment) noexcept {
+  SlabDescriptor* NextSlab = g_ActiveSlab->GetNextSlab();
 
   if (static_cast<bool>(NextSlab)) {
     LOG_ALLOCATOR("DEBUG", "LinearModule: Using Zombie Slab.");
@@ -79,11 +77,10 @@ void *LinearStrategyModule<TContext>::OverFlowAllocate(
   return Allocate(AllocationSize, AllocationAlignment);
 }
 
-template <typename TContext>
-void LinearStrategyModule<TContext>::GrowSlabChain() noexcept {
+template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain() noexcept {
   LOG_ALLOCATOR("DEBUG", "LinearModule: Growing Chain (New Slab).");
 
-  SlabDescriptor *NewSlab = g_SlabRegistry->AllocateSlab();
+  SlabDescriptor* NewSlab = g_SlabRegistry->AllocateSlab();
   NewSlab->SetNextSlab(nullptr);
 
   if (!static_cast<bool>(g_HeadSlab)) {
@@ -107,7 +104,7 @@ void LinearStrategyModule<TContext>::Reset() noexcept
 }
 
 template <typename TContext>
-void LinearStrategyModule<TContext>::RewindState(SlabDescriptor *SavedSlab,
+void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
                                                  uintptr_t SavedOffset) noexcept
   requires(TContext::IsRewindable)
 {
@@ -117,8 +114,7 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor *SavedSlab,
 }
 
 template <typename TContext>
-std::pair<SlabDescriptor *, uintptr_t>
-LinearStrategyModule<TContext>::GetCurrentState() noexcept
+std::pair<SlabDescriptor*, uintptr_t> LinearStrategyModule<TContext>::GetCurrentState() noexcept
   requires(TContext::IsRewindable)
 {
   if (!static_cast<bool>(g_ActiveSlab)) {
@@ -134,15 +130,13 @@ LinearScopedMarker<TContext>::LinearScopedMarker() noexcept : m_HasState(true) {
   m_MarkedOffset = State.second;
 }
 
-template <typename TContext>
-LinearScopedMarker<TContext>::~LinearScopedMarker() noexcept {
+template <typename TContext> LinearScopedMarker<TContext>::~LinearScopedMarker() noexcept {
   if (m_HasState && static_cast<bool>(m_MarkedSlab)) {
     LinearStrategyModule<TContext>::RewindState(m_MarkedSlab, m_MarkedOffset);
   }
 }
 
-template <typename TContext>
-void LinearScopedMarker<TContext>::Commit() noexcept {
+template <typename TContext> void LinearScopedMarker<TContext>::Commit() noexcept {
   m_HasState = false;
 }
 
