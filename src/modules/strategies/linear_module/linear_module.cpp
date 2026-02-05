@@ -20,21 +20,9 @@ template <typename TContext> thread_local size_t LinearStrategyModule<TContext>:
 template <typename TContext> thread_local size_t LinearStrategyModule<TContext>::g_ThreadCount = 0;
 
 template <typename TContext>
-void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance,
-                                                      AllocationStats* Stats) noexcept {
+void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept {
   LOG_ALLOCATOR("INFO", "LinearModule: Initialized.");
   g_SlabRegistry = RegistryInstance;
-  g_GlobalStats = Stats;
-}
-
-template <typename TContext> void LinearStrategyModule<TContext>::FlushThreadStats() noexcept {
-  if (g_GlobalStats && (g_ThreadAllocated > 0 || g_ThreadCount > 0)) {
-    g_GlobalStats->Publish(g_ThreadAllocated, g_ThreadPeak, g_ThreadCount);
-
-    g_ThreadAllocated = 0;
-    g_ThreadPeak = 0;
-    g_ThreadCount = 0;
-  }
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept {

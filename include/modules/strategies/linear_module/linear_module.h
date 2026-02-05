@@ -4,8 +4,6 @@
 
 namespace Allocator {
 
-struct AllocationStats;
-
 template <typename TContext> class LinearModuleThreadGuard;
 
 template <typename TContext> class LinearStrategyModule {
@@ -16,7 +14,6 @@ private:
   static thread_local LinearModuleThreadGuard<TContext> g_ThreadGuard;
 
   static inline SlabRegistry* g_SlabRegistry = nullptr;
-  static inline AllocationStats* g_GlobalStats = nullptr;
 
   static thread_local size_t g_ThreadAllocated;
   static thread_local size_t g_ThreadPeak;
@@ -29,7 +26,7 @@ private:
 public:
   LinearStrategyModule() = delete;
 
-  static void InitializeModule(SlabRegistry* RegistryInstance, AllocationStats* Stats) noexcept;
+  static void InitializeModule(SlabRegistry* RegistryInstance) noexcept;
   static void ShutdownModule() noexcept;
 
   [[nodiscard]] static void* Allocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
