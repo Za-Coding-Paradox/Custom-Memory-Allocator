@@ -22,19 +22,28 @@ template <typename TContext> thread_local size_t LinearStrategyModule<TContext>:
 template <typename TContext>
 void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept {
   LOG_ALLOCATOR("INFO", "LinearModule: Initialized.");
-  g_SlabRegistry = RegistryInstance;
+  g_SlabRegistry.store(RegistryInstance, std::memory_order_release);
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept {
   FlushThreadStats();
 
   LOG_ALLOCATOR("INFO", "LinearModule: Shutting down...");
+
+  SlabRegistry* registry = g_SlabRegistry.load(std::memory_order_acquire);
+
+  if (!registry) {
+    g_HeadSlab = nullptr;
+    g_ActiveSlab = nullptr;
+    return;
+  }
+
   size_t FreedCount = 0;
 
   SlabDescriptor* Current = g_HeadSlab;
   while (static_cast<bool>(Current)) {
     SlabDescriptor* Next = Current->GetNextSlab();
-    g_SlabRegistry->FreeSlab(Current);
+    registry->FreeSlab(Current);
     Current = Next;
     FreedCount++;
   }
@@ -57,6 +66,10 @@ void* LinearStrategyModule<TContext>::Allocate(size_t AllocationSize,
 
   if (!static_cast<bool>(g_ActiveSlab)) [[unlikely]] {
     GrowSlabChain();
+  }
+
+  if (!static_cast<bool>(g_ActiveSlab)) [[unlikely]] {
+    return nullptr;
   }
 
   void* ptr = nullptr;
@@ -99,13 +112,30 @@ void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
   }
 
   GrowSlabChain();
+  if (!g_ActiveSlab || g_ActiveSlab->GetNextSlab() == nullptr && g_ActiveSlab == NextSlab) {
+    return nullptr;
+  }
   return Allocate(AllocationSize, AllocationAlignment);
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain() noexcept {
   LOG_ALLOCATOR("DEBUG", "LinearModule: Growing Chain (New Slab).");
 
-  SlabDescriptor* NewSlab = g_SlabRegistry->AllocateSlab();
+  // FIX: Atomic Load
+  SlabRegistry* registry = g_SlabRegistry.load(std::memory_order_acquire);
+
+  if (!registry) [[unlikely]] {
+    LOG_ALLOCATOR("CRITICAL", "LinearModule: Attempted to grow chain after Registry shutdown.");
+    return;
+  }
+
+  SlabDescriptor* NewSlab = registry->AllocateSlab();
+
+  if (!NewSlab) [[unlikely]] {
+    LOG_ALLOCATOR("CRITICAL", "LinearModule: Registry OOM - Failed to allocate slab.");
+    return;
+  }
+
   NewSlab->SetNextSlab(nullptr);
 
   if (!static_cast<bool>(g_HeadSlab)) {
@@ -138,14 +168,16 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
 {
   LOG_ALLOCATOR("DEBUG", "LinearModule: Rewinding State.");
 
+  SlabRegistry* registry = g_SlabRegistry.load(std::memory_order_acquire);
+
   if (!SavedSlab) {
 
     SlabDescriptor* current = g_HeadSlab;
     while (current != nullptr) {
       SlabDescriptor* next = current->GetNextSlab();
 
-      if (g_SlabRegistry) {
-        g_SlabRegistry->FreeSlab(current);
+      if (registry) {
+        registry->FreeSlab(current);
       }
       current = next;
     }
@@ -161,8 +193,8 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
   while (victim != nullptr) {
     SlabDescriptor* nextVictim = victim->GetNextSlab();
 
-    if (g_SlabRegistry) {
-      g_SlabRegistry->FreeSlab(victim);
+    if (registry) {
+      registry->FreeSlab(victim);
     }
 
     victim = nextVictim;
@@ -197,6 +229,24 @@ template <typename TContext> LinearScopedMarker<TContext>::~LinearScopedMarker()
 
 template <typename TContext> void LinearScopedMarker<TContext>::Commit() noexcept {
   m_HasState = false;
+}
+
+template <typename TContext> void LinearStrategyModule<TContext>::FlushThreadStats() noexcept {
+  if (g_ThreadAllocated > 0) {
+    g_GlobalStats.BytesAllocated.fetch_add(g_ThreadAllocated, std::memory_order_relaxed);
+    g_GlobalStats.AllocationCount.fetch_add(g_ThreadCount, std::memory_order_relaxed);
+
+    size_t currentGlobalPeak = g_GlobalStats.PeakUsage.load(std::memory_order_relaxed);
+    size_t newPeak = currentGlobalPeak + g_ThreadPeak;
+    while (newPeak > currentGlobalPeak &&
+           !g_GlobalStats.PeakUsage.compare_exchange_weak(currentGlobalPeak, newPeak)) {
+      // Retry
+    }
+
+    g_ThreadAllocated = 0;
+    g_ThreadCount = 0;
+    g_ThreadPeak = 0;
+  }
 }
 
 } // namespace Allocator

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <utilities/allocator_utility.h>
 
 namespace Allocator {
@@ -39,22 +40,27 @@ struct HandleMetadata {
 
 class HandleTable {
 private:
-  static constexpr uint32_t INITIAL_CAPACITY = 1024;
-  static constexpr uint32_t MAX_CAPACITY = 1024 * 1024;
+  static constexpr uint32_t ELEMENTS_PER_PAGE = 1024;
+  static constexpr uint32_t MAX_PAGES = 1024;
+  static constexpr uint32_t MAX_CAPACITY = ELEMENTS_PER_PAGE * MAX_PAGES;
   static constexpr uint32_t FREE_LIST_END = 0xFFFFFFFF;
 
-  std::vector<HandleMetadata> m_Metadata;
+  static constexpr uint32_t PAGE_MASK = ELEMENTS_PER_PAGE - 1;
+  static constexpr uint32_t PAGE_SHIFT = 10;
+
+  std::array<std::atomic<HandleMetadata*>, MAX_PAGES> m_Pages;
+
   std::atomic<uint32_t> m_FreeListHead;
   std::atomic<uint32_t> m_Capacity;
   std::atomic<uint32_t> m_ActiveCount;
+
   mutable std::mutex m_GrowthMutex;
 
-  void InitializeFreeList(uint32_t Start, uint32_t End) noexcept;
   bool GrowCapacity() noexcept;
 
 public:
-  explicit HandleTable(uint32_t InitialCapacity = INITIAL_CAPACITY) noexcept;
-  ~HandleTable() noexcept = default;
+  explicit HandleTable(uint32_t InitialCapacity = ELEMENTS_PER_PAGE) noexcept;
+  ~HandleTable() noexcept;
 
   HandleTable(const HandleTable&) = delete;
   HandleTable& operator=(const HandleTable&) = delete;

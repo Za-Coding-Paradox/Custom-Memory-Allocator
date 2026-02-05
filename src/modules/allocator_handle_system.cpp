@@ -1,6 +1,4 @@
-#include "modules/allocator_handle_system.h" // Ensure this path matches your include structure
-
-#include <algorithm> // For std::max, std::min
+#include "modules/allocator_handle_system.h"
 
 namespace Allocator {
 
@@ -25,68 +23,74 @@ size_t Handle::Hash::operator()(const Handle& H) const noexcept {
 HandleMetadata::HandleMetadata() noexcept : Pointer(nullptr), Generation(1), NextFree(0) {}
 
 HandleTable::HandleTable(uint32_t InitialCapacity) noexcept
-    : m_FreeListHead(0), m_Capacity(0), m_ActiveCount(0) {
+    : m_FreeListHead(FREE_LIST_END), m_Capacity(0), m_ActiveCount(0) {
 
-  m_Metadata.reserve(MAX_CAPACITY);
+  for (auto& page : m_Pages) {
+    page.store(nullptr, std::memory_order_relaxed);
+  }
 
-  const uint32_t ClampedCapacity = std::max(uint32_t(16), std::min(InitialCapacity, MAX_CAPACITY));
+  if (InitialCapacity == 0)
+    InitialCapacity = ELEMENTS_PER_PAGE;
 
-  m_Metadata.resize(ClampedCapacity);
+  uint32_t pagesNeeded = (InitialCapacity + ELEMENTS_PER_PAGE - 1) / ELEMENTS_PER_PAGE;
+  if (pagesNeeded == 0)
+    pagesNeeded = 1;
 
-  InitializeFreeList(0, ClampedCapacity);
+  LOG_ALLOCATOR("INFO", "HandleTable: Initializing with " << pagesNeeded << " pages.");
 
-  m_Capacity.store(ClampedCapacity, std::memory_order_release);
-
-  LOG_ALLOCATOR("INFO", "HandleTable: Initialized with capacity "
-                            << ClampedCapacity << " (Reserved Max: " << g_MaxCapacity << ")");
+  for (uint32_t i = 0; i < pagesNeeded; ++i) {
+    GrowCapacity();
+  }
 }
 
-void HandleTable::InitializeFreeList(uint32_t Start, uint32_t End) noexcept {
-  for (uint32_t i = Start; i < End - 1; ++i) {
-    m_Metadata[i].NextFree = i + 1;
-    m_Metadata[i].Pointer = nullptr;
-
-    if (m_Metadata[i].Generation == 0) {
-      m_Metadata[i].Generation = 1;
+HandleTable::~HandleTable() noexcept {
+  LOG_ALLOCATOR("INFO", "HandleTable: Shutting down. Cleaning up pages.");
+  for (auto& pageAtom : m_Pages) {
+    HandleMetadata* page = pageAtom.load(std::memory_order_relaxed);
+    if (page) {
+      delete[] page;
+      pageAtom.store(nullptr, std::memory_order_relaxed);
     }
-  }
-
-  if (End > 0) {
-    uint32_t currentHead = m_FreeListHead.load(std::memory_order_relaxed);
-    m_Metadata[End - 1].NextFree = (Start == 0) ? FREE_LIST_END : currentHead;
-  }
-
-  if (End > Start) {
-    m_FreeListHead.store(Start, std::memory_order_release);
   }
 }
 
 bool HandleTable::GrowCapacity() noexcept {
   std::lock_guard<std::mutex> lock(m_GrowthMutex);
 
-  uint32_t currentCapacity = m_Capacity.load(std::memory_order_acquire);
+  uint32_t currentCap = m_Capacity.load(std::memory_order_relaxed);
+  uint32_t nextPageIndex = currentCap / ELEMENTS_PER_PAGE;
 
-  if (m_FreeListHead.load(std::memory_order_acquire) != FREE_LIST_END) {
-    return true;
-  }
-
-  uint32_t newCapacity = std::min(currentCapacity * 2, MAX_CAPACITY);
-
-  if (newCapacity <= currentCapacity) {
-    LOG_ALLOCATOR("ERROR", "HandleTable: Cannot grow beyond MAX_CAPACITY");
+  if (nextPageIndex >= MAX_PAGES) {
+    LOG_ALLOCATOR("CRITICAL",
+                  "HandleTable: Max Capacity Reached (" << MAX_CAPACITY << "). Cannot Grow.");
     return false;
   }
 
-  size_t oldSize = m_Metadata.size();
-  m_Metadata.resize(newCapacity);
+  HandleMetadata* newPage = new (std::nothrow) HandleMetadata[ELEMENTS_PER_PAGE];
+  if (!newPage) {
+    LOG_ALLOCATOR("CRITICAL", "HandleTable: Failed to allocate new page (OOM).");
+    return false;
+  }
 
-  InitializeFreeList(static_cast<uint32_t>(oldSize), newCapacity);
+  uint32_t baseIndex = nextPageIndex * ELEMENTS_PER_PAGE;
 
-  m_Capacity.store(newCapacity, std::memory_order_release);
+  for (uint32_t i = 0; i < ELEMENTS_PER_PAGE - 1; ++i) {
+    newPage[i].NextFree = baseIndex + i + 1;
+    newPage[i].Generation = 1;
+  }
 
-  LOG_ALLOCATOR("INFO",
-                "HandleTable: Grew capacity from " << currentCapacity << " to " << newCapacity);
+  newPage[ELEMENTS_PER_PAGE - 1].NextFree = m_FreeListHead.load(std::memory_order_relaxed);
+  newPage[ELEMENTS_PER_PAGE - 1].Generation = 1;
 
+  m_Pages[nextPageIndex].store(newPage, std::memory_order_release);
+
+  m_FreeListHead.store(baseIndex, std::memory_order_release);
+
+  uint32_t newTotalCapacity = baseIndex + ELEMENTS_PER_PAGE;
+  m_Capacity.store(newTotalCapacity, std::memory_order_release);
+
+  LOG_ALLOCATOR("DEBUG", "HandleTable: Grew Capacity to " << newTotalCapacity << " (Page "
+                                                          << nextPageIndex << ")");
   return true;
 }
 
@@ -97,37 +101,42 @@ Handle HandleTable::Allocate(void* Pointer) noexcept {
   }
 
   while (true) {
-    uint32_t index = m_FreeListHead.load(std::memory_order_acquire);
+    uint32_t currentIndex = m_FreeListHead.load(std::memory_order_acquire);
 
-    if (index == FREE_LIST_END) {
-      // Try to grow capacity
+    if (currentIndex == FREE_LIST_END) {
       if (!GrowCapacity()) {
-        LOG_ALLOCATOR("ERROR", "HandleTable: Allocation failed - out of capacity");
         return INVALID_HANDLE;
       }
       continue;
     }
 
-    if (index >= m_Capacity.load(std::memory_order_acquire)) {
-      LOG_ALLOCATOR("CRITICAL", "HandleTable: Corrupted free list - invalid index " << index);
+    // Calculate Page and Slot
+    uint32_t pageIndex = currentIndex >> PAGE_SHIFT;
+    uint32_t slotIndex = currentIndex & PAGE_MASK;
+
+    HandleMetadata* page = m_Pages[pageIndex].load(std::memory_order_acquire);
+
+    if (!page) [[unlikely]] {
+      LOG_ALLOCATOR("CRITICAL",
+                    "HandleTable: Null page encountered for valid index " << currentIndex);
       return INVALID_HANDLE;
     }
 
-    uint32_t nextFree = m_Metadata[index].NextFree;
+    uint32_t nextFree = page[slotIndex].NextFree;
 
-    if (m_FreeListHead.compare_exchange_weak(index, nextFree, std::memory_order_release,
+    if (m_FreeListHead.compare_exchange_weak(currentIndex, nextFree, std::memory_order_release,
                                              std::memory_order_acquire)) {
-      HandleMetadata& meta = m_Metadata[index];
 
+      HandleMetadata& meta = page[slotIndex];
       meta.Pointer = Pointer;
+
       uint32_t generation = meta.Generation;
 
       m_ActiveCount.fetch_add(1, std::memory_order_relaxed);
 
-      LOG_ALLOCATOR("DEBUG", "HandleTable: Allocated handle - Index: " << index << " Generation: "
-                                                                       << generation);
-
-      return Handle(index, generation);
+      LOG_ALLOCATOR("DEBUG",
+                    "HandleTable: Allocated Handle ID: " << currentIndex << " Gen: " << generation);
+      return Handle(currentIndex, generation);
     }
   }
 }
@@ -141,14 +150,23 @@ void* HandleTable::Resolve(Handle H) const noexcept {
   uint32_t generation = H.GetGeneration();
 
   if (index >= m_Capacity.load(std::memory_order_acquire)) {
-    LOG_ALLOCATOR("WARN", "HandleTable: Resolve failed - index out of bounds: " << index);
+    LOG_ALLOCATOR("WARN", "HandleTable: Resolve Index out of bounds: " << index);
     return nullptr;
   }
 
-  const HandleMetadata& meta = m_Metadata[index];
+  uint32_t pageIndex = index >> PAGE_SHIFT;
+  uint32_t slotIndex = index & PAGE_MASK;
+
+  HandleMetadata* page = m_Pages[pageIndex].load(std::memory_order_acquire);
+
+  if (!page) [[unlikely]] {
+    return nullptr;
+  }
+
+  const HandleMetadata& meta = page[slotIndex];
 
   if (meta.Generation != generation) {
-    LOG_ALLOCATOR("DEBUG", "HandleTable: Resolve failed - stale handle (gen mismatch)");
+    LOG_ALLOCATOR("DEBUG", "HandleTable: Stale Handle Resolve (Gen Mismatch). ID: " << index);
     return nullptr;
   }
 
@@ -157,7 +175,6 @@ void* HandleTable::Resolve(Handle H) const noexcept {
 
 bool HandleTable::Free(Handle H) noexcept {
   if (!H.IsValid()) {
-    LOG_ALLOCATOR("WARN", "HandleTable: Attempted to free invalid handle");
     return false;
   }
 
@@ -165,24 +182,26 @@ bool HandleTable::Free(Handle H) noexcept {
   uint32_t generation = H.GetGeneration();
 
   if (index >= m_Capacity.load(std::memory_order_acquire)) {
-    LOG_ALLOCATOR("ERROR", "HandleTable: Free failed - index out of bounds: " << index);
+    LOG_ALLOCATOR("ERROR", "HandleTable: Free Index out of bounds: " << index);
     return false;
   }
 
-  HandleMetadata& meta = m_Metadata[index];
+  uint32_t pageIndex = index >> PAGE_SHIFT;
+  uint32_t slotIndex = index & PAGE_MASK;
+
+  HandleMetadata* page = m_Pages[pageIndex].load(std::memory_order_acquire);
+  HandleMetadata& meta = page[slotIndex];
 
   if (meta.Generation != generation) {
-    LOG_ALLOCATOR("WARN", "HandleTable: Free failed - generation mismatch (double free?)");
+    LOG_ALLOCATOR("WARN", "HandleTable: Double Free or Stale Handle detected. ID: " << index);
     return false;
   }
 
   meta.Pointer = nullptr;
 
   meta.Generation++;
-  if (meta.Generation == 0) {
+  if (meta.Generation == 0)
     meta.Generation = 1;
-  }
-
   while (true) {
     uint32_t currentHead = m_FreeListHead.load(std::memory_order_acquire);
     meta.NextFree = currentHead;
@@ -190,70 +209,74 @@ bool HandleTable::Free(Handle H) noexcept {
     if (m_FreeListHead.compare_exchange_weak(currentHead, index, std::memory_order_release,
                                              std::memory_order_acquire)) {
       m_ActiveCount.fetch_sub(1, std::memory_order_relaxed);
-
-      LOG_ALLOCATOR("DEBUG", "HandleTable: Freed handle - Index: " << index);
+      LOG_ALLOCATOR("DEBUG", "HandleTable: Freed Handle ID: " << index);
       return true;
     }
   }
 }
 
 bool HandleTable::IsValid(Handle H) const noexcept {
-  if (!H.IsValid()) {
+  if (!H.IsValid())
     return false;
-  }
 
   uint32_t index = H.GetIndex();
-  uint32_t generation = H.GetGeneration();
-
-  if (index >= m_Capacity.load(std::memory_order_acquire)) {
+  if (index >= m_Capacity.load(std::memory_order_acquire))
     return false;
-  }
 
-  return m_Metadata[index].Generation == generation;
+  uint32_t pageIndex = index >> PAGE_SHIFT;
+  uint32_t slotIndex = index & PAGE_MASK;
+
+  HandleMetadata* page = m_Pages[pageIndex].load(std::memory_order_acquire);
+  return page && (page[slotIndex].Generation == H.GetGeneration());
 }
 
 bool HandleTable::Update(Handle H, void* NewPointer) noexcept {
-  if (!H.IsValid()) {
+  if (!IsValid(H))
     return false;
-  }
 
   uint32_t index = H.GetIndex();
-  uint32_t generation = H.GetGeneration();
+  uint32_t pageIndex = index >> PAGE_SHIFT;
+  uint32_t slotIndex = index & PAGE_MASK;
 
-  if (index >= m_Capacity.load(std::memory_order_acquire)) {
-    return false;
+  HandleMetadata* page = m_Pages[pageIndex].load(std::memory_order_acquire);
+
+  HandleMetadata& meta = page[slotIndex];
+  if (meta.Generation == H.GetGeneration()) {
+    meta.Pointer = NewPointer;
+    return true;
   }
-
-  HandleMetadata& meta = m_Metadata[index];
-
-  if (meta.Generation != generation) {
-    return false;
-  }
-
-  meta.Pointer = NewPointer;
-
-  LOG_ALLOCATOR("DEBUG", "HandleTable: Updated handle - Index: " << index);
-  return true;
+  return false;
 }
 
 void HandleTable::Clear() noexcept {
-  LOG_ALLOCATOR("INFO", "HandleTable: Clearing all handles");
+  LOG_ALLOCATOR("INFO", "HandleTable: Clearing all handles (Soft Reset).");
 
-  uint32_t capacity = m_Capacity.load(std::memory_order_acquire);
+  uint32_t cap = m_Capacity.load(std::memory_order_relaxed);
+  uint32_t pages = (cap + ELEMENTS_PER_PAGE - 1) / ELEMENTS_PER_PAGE;
 
-  for (uint32_t i = 0; i < capacity; ++i) {
-    m_Metadata[i].Pointer = nullptr;
-    m_Metadata[i].Generation++;
-    if (m_Metadata[i].Generation == 0) {
-      m_Metadata[i].Generation = 1;
+  for (uint32_t p = 0; p < pages; ++p) {
+    HandleMetadata* page = m_Pages[p].load(std::memory_order_relaxed);
+    if (!page)
+      continue;
+
+    uint32_t baseIndex = p * ELEMENTS_PER_PAGE;
+    for (uint32_t i = 0; i < ELEMENTS_PER_PAGE; ++i) {
+      page[i].Pointer = nullptr;
+      page[i].Generation++;
+      if (page[i].Generation == 0)
+        page[i].Generation = 1;
+
+      page[i].NextFree = baseIndex + i + 1;
     }
   }
 
-  InitializeFreeList(0, capacity);
+  if (pages > 0) {
+    HandleMetadata* lastPage = m_Pages[pages - 1].load(std::memory_order_relaxed);
+    lastPage[ELEMENTS_PER_PAGE - 1].NextFree = FREE_LIST_END;
+  }
 
+  m_FreeListHead.store(0, std::memory_order_release);
   m_ActiveCount.store(0, std::memory_order_release);
-
-  LOG_ALLOCATOR("INFO", "HandleTable: Clear complete");
 }
 
 uint32_t HandleTable::GetActiveCount() const noexcept {
@@ -265,16 +288,12 @@ uint32_t HandleTable::GetCapacity() const noexcept {
 }
 
 float HandleTable::GetUtilization() const noexcept {
-  uint32_t active = m_ActiveCount.load(std::memory_order_relaxed);
-  uint32_t capacity = m_Capacity.load(std::memory_order_relaxed);
-  return capacity > 0 ? (static_cast<float>(active) / capacity) : 0.0f;
+  uint32_t cap = m_Capacity.load(std::memory_order_relaxed);
+  return cap > 0 ? (static_cast<float>(m_ActiveCount.load(std::memory_order_relaxed)) / cap) : 0.0f;
 }
 
 } // namespace Allocator
 
-// ============================================================================
-// Standard Library Hash Implementation (Non-Template)
-// ============================================================================
 namespace std {
 size_t hash<Allocator::Handle>::operator()(const Allocator::Handle& H) const noexcept {
   return Allocator::Handle::Hash{}(H);

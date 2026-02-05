@@ -4,6 +4,7 @@
 
 namespace Allocator {
 
+struct ContextStats;
 template <typename TContext> class LinearModuleThreadGuard;
 
 template <typename TContext> class LinearStrategyModule {
@@ -13,11 +14,13 @@ private:
 
   static thread_local LinearModuleThreadGuard<TContext> g_ThreadGuard;
 
-  static inline SlabRegistry* g_SlabRegistry = nullptr;
+  static inline std::atomic<SlabRegistry*> g_SlabRegistry{nullptr};
 
   static thread_local size_t g_ThreadAllocated;
   static thread_local size_t g_ThreadPeak;
   static thread_local size_t g_ThreadCount;
+
+  static ContextStats g_GlobalStats;
 
   static void* OverFlowAllocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
   static void GrowSlabChain() noexcept;
@@ -43,6 +46,8 @@ public:
 
   [[nodiscard]] static std::pair<SlabDescriptor*, uintptr_t> GetCurrentState() noexcept
     requires(TContext::IsRewindable);
+
+  static ContextStats& GetGlobalStats() noexcept { return g_GlobalStats; }
 };
 
 template <typename TContext> class LinearModuleThreadGuard {
