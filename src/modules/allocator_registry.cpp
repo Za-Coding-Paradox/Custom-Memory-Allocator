@@ -1,4 +1,4 @@
-#include "modules/allocator_registry.h"
+#include <modules/allocator_registry.h>
 
 namespace Allocator {
 
@@ -42,157 +42,129 @@ void SlabDescriptor::UpdateFreeListHead(uintptr_t FreeListHead) noexcept {
 }
 
 SlabRegistry::SlabRegistry(size_t SlabSize, size_t RequestedArenaSize) noexcept
-    : m_DescriptorCount(0), m_ArenaRegistryStart(nullptr), m_ArenaSlabsStart(nullptr),
-      m_ArenaSize(RequestedArenaSize), m_SlabSize(SlabSize) {
-
-  LOG_ALLOCATOR("INFO", "SlabRegistry: Registry Initialization Started.");
-
-  if (!InitializeArena()) {
-    LOG_ALLOCATOR("CRITICAL", "SlabRegistry: Registry failed to allocate OS Memory Arena.");
-    exit(1);
+    : m_DescriptorCount(0), m_BitMapSizeInWords(0), m_ArenaRegistryStart(nullptr),
+      m_ArenaSlabsStart(nullptr), m_ArenaSize(RequestedArenaSize), m_SlabSize(SlabSize) {
+  if (static_cast<bool>(InitializeArena()) == false) {
+    LOG_ALLOCATOR("CRITICAL", "SlabRegistry: Failed to initialize arena.");
   }
-
-  m_DescriptorCount = m_ArenaSize / m_SlabSize;
-  LOG_ALLOCATOR("INFO", "SlabRegistry: Descriptor Count Calculated: " << m_DescriptorCount);
-
-  m_DescriptorSpan = std::span<SlabDescriptor>(static_cast<SlabDescriptor*>(m_ArenaRegistryStart),
-                                               m_DescriptorCount);
-
-  const size_t Uint64Count = (m_DescriptorCount + g_AlignmentMask) / g_BitsPerBlock;
-
-  void* const BitMapStart =
-      Utility::Add(m_ArenaRegistryStart, m_DescriptorCount * sizeof(SlabDescriptor));
-
-  m_BitMap = std::span<uint64_t>(static_cast<uint64_t*>(BitMapStart), Uint64Count);
-
-  std::ranges::fill(m_BitMap, g_EmptyBlock);
-
-  void* const EndOfMetadata = Utility::Add(BitMapStart, Uint64Count * sizeof(uint64_t));
-  m_ArenaSlabsStart = Utility::AlignForward(EndOfMetadata, m_SlabSize);
-
-  for (const size_t SlabIndex : std::views::iota(0ULL, m_DescriptorCount)) {
-    void* const PhysicalAddr = Utility::GetSlabStart(SlabIndex, m_ArenaSlabsStart, m_SlabSize);
-
-    SlabDescriptor& Current = m_DescriptorSpan[SlabIndex];
-
-    new (&Current)
-        SlabDescriptor(SlabConfig{.p_StartAddress = std::bit_cast<uintptr_t>(PhysicalAddr),
-                                  .p_FreeListHead = std::bit_cast<uintptr_t>(PhysicalAddr),
-                                  .p_TotalSlots = 0,
-                                  .p_SlabMemory = m_SlabSize});
-  }
-
-  LOG_ALLOCATOR("INFO", "SlabRegistry: Registry Initialization Complete.");
 }
 
-SlabRegistry::~SlabRegistry() noexcept {
-  LOG_ALLOCATOR("INFO", "SlabRegistry: Registry Shutdown Initiated.");
-  ShutdownArena();
-}
+SlabRegistry::~SlabRegistry() noexcept { ShutdownArena(); }
 
 bool SlabRegistry::InitializeArena() noexcept {
-  void* RawMemory = nullptr;
-#ifdef _WIN32
-  RawMemory = VirtualAlloc(nullptr, m_ArenaSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-  if (RawMemory == nullptr) {
-    LOG_ALLOCATOR("ERROR", "SlabRegistry: VirtualAlloc failed - Error Code: " << GetLastError());
-    return false;
-  }
-#else
-  RawMemory =
+  m_ArenaRegistryStart =
       mmap(nullptr, m_ArenaSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (RawMemory == MAP_FAILED) {
-    LOG_ALLOCATOR("ERROR", "SlabRegistry: mmap failed during initialization.");
+  if (m_ArenaRegistryStart == MAP_FAILED) {
+    m_ArenaRegistryStart = nullptr;
     return false;
   }
-#endif
-  m_ArenaRegistryStart = RawMemory;
+
+  size_t UnitSize = sizeof(SlabDescriptor) + m_SlabSize;
+  size_t EstimatedCount = m_ArenaSize / UnitSize;
+  if (EstimatedCount * UnitSize + 4096 > m_ArenaSize) {
+    EstimatedCount--;
+  }
+
+  m_DescriptorCount = EstimatedCount;
+  if (m_DescriptorCount == 0) {
+    return false;
+  }
+
+  SlabDescriptor* DescriptorBase = static_cast<SlabDescriptor*>(m_ArenaRegistryStart);
+  uintptr_t BaseAddr = reinterpret_cast<uintptr_t>(m_ArenaRegistryStart);
+  uintptr_t SlabRegionStart = BaseAddr + (m_DescriptorCount * sizeof(SlabDescriptor));
+
+  const size_t Alignment = 4096;
+  size_t Padding = 0;
+  if ((SlabRegionStart % Alignment) != 0) {
+    Padding = Alignment - (SlabRegionStart % Alignment);
+  }
+  SlabRegionStart += Padding;
+
+  m_ArenaSlabsStart = std::bit_cast<void*>(SlabRegionStart);
+  uint8_t* CurrentSlabPtr = static_cast<uint8_t*>(m_ArenaSlabsStart);
+
+  m_BitMapSizeInWords = (m_DescriptorCount + 63) / 64;
+  m_BitMap = std::make_unique<std::atomic<uint64_t>[]>(m_BitMapSizeInWords);
+  for (size_t Index = 0; Index < m_BitMapSizeInWords; ++Index) {
+    m_BitMap[Index].store(0, std::memory_order_relaxed);
+  }
+
+  for (size_t Index = 0; Index < m_DescriptorCount; ++Index) {
+    if (reinterpret_cast<uintptr_t>(CurrentSlabPtr + m_SlabSize) > (BaseAddr + m_ArenaSize)) {
+      m_DescriptorCount = Index;
+      break;
+    }
+
+    SlabConfig Config;
+    Config.p_StartAddress = reinterpret_cast<uintptr_t>(CurrentSlabPtr);
+    Config.p_FreeListHead = Config.p_StartAddress;
+    Config.p_SlabMemory = m_SlabSize;
+    Config.p_TotalSlots = 0;
+
+    new (&DescriptorBase[Index]) SlabDescriptor(Config);
+    CurrentSlabPtr += m_SlabSize;
+  }
+
+  m_DescriptorSpan = std::span<SlabDescriptor>(DescriptorBase, m_DescriptorCount);
   return true;
 }
 
 void SlabRegistry::ShutdownArena() noexcept {
-  if (m_ArenaRegistryStart == nullptr) {
-    return;
+  if (static_cast<bool>(m_ArenaRegistryStart)) {
+    munmap(m_ArenaRegistryStart, m_ArenaSize);
+    m_ArenaRegistryStart = nullptr;
   }
-
-#ifdef _WIN32
-  if (!VirtualFree(m_ArenaRegistryStart, 0, MEM_RELEASE)) {
-    LOG_ALLOCATOR("ERROR", "SlabRegistry: VirtualFree failed during shutdown.");
-  }
-#else
-  munmap(m_ArenaRegistryStart, m_ArenaSize);
-#endif
-  m_ArenaRegistryStart = nullptr;
-  m_ArenaSlabsStart = nullptr;
-  m_DescriptorSpan = {};
-  m_DescriptorCount = 0;
 }
 
-[[nodiscard]] size_t SlabRegistry::GetDescriptorCount() const noexcept { return m_DescriptorCount; }
-
-[[nodiscard]] void* SlabRegistry::GetArenaSlabsStart() const noexcept { return m_ArenaSlabsStart; }
-
-[[nodiscard]] size_t SlabRegistry::GetSlabSize() const noexcept { return m_SlabSize; }
-
-[[nodiscard]] size_t SlabRegistry::GetArenaSize() const noexcept { return m_ArenaSize; }
-
 [[nodiscard]] SlabDescriptor* SlabRegistry::AllocateSlab() noexcept {
-  std::lock_guard<std::mutex> lock(m_AllocationMutex);
+  for (size_t Index = 0; Index < m_BitMapSizeInWords; ++Index) {
+    uint64_t CurrentWord = m_BitMap[Index].load(std::memory_order_relaxed);
+    if (CurrentWord == ~0ULL) {
+      continue;
+    }
 
-  for (size_t BlockIdx = 0; BlockIdx < m_BitMap.size(); ++BlockIdx) {
-    uint64_t& CurrentBlock = m_BitMap[BlockIdx];
+    int BitIndex = std::countr_one(CurrentWord);
+    if (BitIndex >= 64) {
+      continue;
+    }
 
-    if (CurrentBlock != g_FullBlock) [[likely]] {
-      const int BitPos = std::countr_one(CurrentBlock);
+    uint64_t Mask = static_cast<uint64_t>(1ULL) << BitIndex;
 
-      if (BlockIdx > m_DescriptorCount / g_BitsPerBlock) {
-        LOG_ALLOCATOR("ERROR", "SlabRegistry: BlockIdx out of range.");
-        return nullptr;
+    if ((CurrentWord & Mask) == 0) {
+      if (static_cast<bool>(m_BitMap[Index].compare_exchange_weak(CurrentWord, CurrentWord | Mask,
+                                                                  std::memory_order_acquire,
+                                                                  std::memory_order_relaxed))) {
+        size_t SlabIndex = (Index * 64) + static_cast<size_t>(BitIndex);
+        if (SlabIndex >= m_DescriptorCount) {
+          return nullptr;
+        }
+
+        SlabDescriptor* Slab = std::launder(&m_DescriptorSpan[SlabIndex]);
+        Slab->ResetSlab();
+        return Slab;
       }
-
-      const size_t SlabIndex = (BlockIdx * g_BitsPerBlock) + static_cast<size_t>(BitPos);
-
-      if (SlabIndex >= m_DescriptorCount) [[unlikely]] {
-        LOG_ALLOCATOR("ERROR", "SlabRegistry: AllocateSlab OOM - Index out of bounds.");
-        return nullptr;
-      }
-
-      CurrentBlock |= (1ULL << BitPos);
-
-      SlabDescriptor& Descriptor = m_DescriptorSpan[SlabIndex];
-      Descriptor.ResetSlab();
-
-      LOG_ALLOCATOR("DEBUG", "SlabRegistry: Slab Allocated - Index: " << SlabIndex);
-      return &Descriptor;
     }
   }
-
-  LOG_ALLOCATOR("CRITICAL", "SlabRegistry: AllocateSlab Failed - Arena Full.");
   return nullptr;
 }
 
 void SlabRegistry::FreeSlab(SlabDescriptor* SlabToFree) noexcept {
-  std::lock_guard<std::mutex> lock(m_AllocationMutex);
-
-  if (SlabToFree == nullptr) {
-    LOG_ALLOCATOR("WARN", "SlabRegistry: Attempted to free nullptr slab.");
+  if (static_cast<bool>(SlabToFree) == false) {
     return;
   }
 
-  const size_t SlabIndex = Utility::GetSlabIndex(std::bit_cast<void*>(SlabToFree->GetSlabStart()),
-                                                 m_ArenaSlabsStart, m_SlabSize);
-
-  if (SlabIndex >= m_DescriptorCount) [[unlikely]] {
-    LOG_ALLOCATOR("ERROR", "SlabRegistry: FreeSlab failed - Invalid Slab Index: " << SlabIndex);
+  SlabDescriptor* Base = m_DescriptorSpan.data();
+  SlabDescriptor* End = Base + m_DescriptorCount;
+  if (SlabToFree < Base || SlabToFree >= End) {
     return;
   }
 
-  const size_t BlockIdx = SlabIndex / g_BitsPerBlock;
-  const size_t BitIdx = SlabIndex % g_BitsPerBlock;
-
-  m_BitMap[BlockIdx] &= ~(1ULL << BitIdx);
-
-  SlabToFree->ResetSlab();
-  LOG_ALLOCATOR("DEBUG", "SlabRegistry: Slab Freed - Index: " << SlabIndex);
+  ptrdiff_t PtrDiffIndex = SlabToFree - Base;
+  size_t WordIndex = static_cast<size_t>(PtrDiffIndex) / 64;
+  size_t BitIndex = static_cast<size_t>(PtrDiffIndex) % 64;
+  uint64_t Mask = static_cast<uint64_t>(1ULL) << BitIndex;
+  m_BitMap[WordIndex].fetch_and(~Mask, std::memory_order_release);
 }
+
 } // namespace Allocator

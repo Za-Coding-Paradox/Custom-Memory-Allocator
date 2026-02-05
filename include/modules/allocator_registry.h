@@ -24,11 +24,11 @@ private:
   uintptr_t m_FreeListHead;
   size_t m_ActiveSlots;
   size_t m_TotalSlots;
-  SlabDescriptor *m_NextSlab;
+  SlabDescriptor* m_NextSlab;
   size_t m_AvailableSlabMemory;
 
 public:
-  SlabDescriptor(const SlabConfig &Config) noexcept;
+  SlabDescriptor(const SlabConfig& Config) noexcept;
 
   void ResetSlab() noexcept;
 
@@ -36,7 +36,7 @@ public:
   void SetTotalSlots(size_t TotalSlots) noexcept;
   void SetActiveSlots(size_t ActiveSlots) noexcept;
   void IncrementActiveSlots() noexcept;
-  void SetNextSlab(SlabDescriptor *NextSlab) noexcept;
+  void SetNextSlab(SlabDescriptor* NextSlab) noexcept;
   void UpdateFreeListHead(uintptr_t FreeListHead) noexcept;
 
   [[nodiscard]] uintptr_t GetSlabStart() const noexcept;
@@ -44,23 +44,23 @@ public:
   [[nodiscard]] size_t GetTotalSlots() const noexcept;
   [[nodiscard]] size_t GetActiveSlots() const noexcept;
   [[nodiscard]] size_t GetAvailableMemorySize() const noexcept;
-  [[nodiscard]] SlabDescriptor *GetNextSlab() const noexcept;
+  [[nodiscard]] SlabDescriptor* GetNextSlab() const noexcept;
 };
 
 class SlabRegistry {
 private:
   std::span<SlabDescriptor> m_DescriptorSpan;
-  std::span<uint64_t> m_BitMap;
   size_t m_DescriptorCount;
 
-  void *m_ArenaRegistryStart;
-  void *m_ArenaSlabsStart;
+  std::unique_ptr<std::atomic<uint64_t>[]> m_BitMap;
+  size_t m_BitMapSizeInWords;
 
-  // FIX (Bug #17): Made instance-local instead of static
+  void* m_ArenaRegistryStart;
+  void* m_ArenaSlabsStart;
+
   size_t m_ArenaSize;
   size_t m_SlabSize;
 
-  // FIX (Bug #5): Added mutex for thread-safe bitmap access
   std::mutex m_AllocationMutex;
 
   [[nodiscard]] bool InitializeArena() noexcept;
@@ -69,21 +69,20 @@ private:
 public:
   SlabRegistry(size_t SlabSize = g_ConstSlabSize,
                size_t RequestedArenaSize = g_ConstArenaSize) noexcept;
-  ~SlabRegistry() noexcept; // FIX (Bug #13): Added noexcept
 
-  SlabRegistry(const SlabRegistry &) = delete;
-  SlabRegistry &operator=(const SlabRegistry &) = delete;
-  SlabRegistry(SlabRegistry &&) = delete;
-  SlabRegistry &operator=(SlabRegistry &&) = delete;
+  ~SlabRegistry() noexcept;
+  SlabRegistry(const SlabRegistry&) = delete;
+  SlabRegistry& operator=(const SlabRegistry&) = delete;
+  SlabRegistry(SlabRegistry&&) = delete;
+  SlabRegistry& operator=(SlabRegistry&&) = delete;
 
   [[nodiscard]] size_t GetDescriptorCount() const noexcept;
-  [[nodiscard]] void *GetArenaSlabsStart() const noexcept;
+  [[nodiscard]] void* GetArenaSlabsStart() const noexcept;
 
-  // FIX (Bug #17): Made instance methods instead of static
   [[nodiscard]] size_t GetSlabSize() const noexcept;
   [[nodiscard]] size_t GetArenaSize() const noexcept;
 
-  [[nodiscard]] SlabDescriptor *AllocateSlab() noexcept;
-  void FreeSlab(SlabDescriptor *SlabToFree) noexcept;
+  [[nodiscard]] SlabDescriptor* AllocateSlab() noexcept;
+  void FreeSlab(SlabDescriptor* SlabToFree) noexcept;
 };
 } // namespace Allocator

@@ -1,9 +1,9 @@
 ---
 # Enable checks for:
-# - Bugprone: Common bugs (use-after-free, narrowing conversions, etc.)
-# - Modernize: Suggests C++20 features (auto, nullptr, override, etc.)
-# - Performance: Unnecessary copies, expensive loops
-# - Readability: Naming conventions, clarity
+# - Bugprone: Common bugs
+# - Modernize: C++20/17 features
+# - Performance: Efficiency checks
+# - Readability: Naming conventions
 # - Clang-Analyzer: Deep static analysis
 Checks: >
   -*,
@@ -15,27 +15,65 @@ Checks: >
   misc-*,
   -modernize-use-trailing-return-type,
   -readability-identifier-length,
-  -readability-magic-numbers,
   -llvmlibc-*
 
-# header-filter regex to ensure it checks your source files but ignores system libs
+# Regex to ensure it checks your source files but ignores system libs
 HeaderFilterRegex: 'src/.*|include/.*'
 
+# ----------------------------------------------------------------------------
+# CHECK OPTIONS
+# ----------------------------------------------------------------------------
+# NOTE: Modern syntax uses "Key: Value" directly, not "- key: X, value: Y"
 CheckOptions:
-  # Enforce variable naming (camelBack)
-  - key:             readability-identifier-naming.VariableCase
-    value:           camelBack
-  # Enforce function naming (CamelCase)
-  - key:             readability-identifier-naming.FunctionCase
-    value:           CamelCase
-  # Enforce private member naming (m_ prefix is common, or just camelBack_)
-  - key:             readability-identifier-naming.PrivateMemberSuffix
-    value:           _
-  - key:             readability-identifier-naming.StructCase
-    value:           CamelCase
-  - key:             readability-identifier-naming.ClassCase
-    value:           CamelCase
-  # Modernize: reasonable complexity limits
-  - key:             readability-function-cognitive-complexity.Threshold
-    value:           25
-...
+  # --------------------------------------------------------------------------
+  # FUNCTION & VARIABLE NAMING (CamelCase)
+  # --------------------------------------------------------------------------
+  readability-identifier-naming.FunctionCase: CamelCase
+  readability-identifier-naming.LocalVariableCase: CamelCase
+  readability-identifier-naming.ParameterCase: CamelCase
+
+  # --------------------------------------------------------------------------
+  # CLASS MEMBER NAMING
+  # --------------------------------------------------------------------------
+  # Private Members: m_CamelCase
+  readability-identifier-naming.PrivateMemberCase: CamelCase
+  readability-identifier-naming.PrivateMemberPrefix: m_
+
+  # Public Members: p_CamelCase
+  readability-identifier-naming.PublicMemberCase: CamelCase
+  readability-identifier-naming.PublicMemberPrefix: p_
+
+  # Protected Members: m_CamelCase
+  readability-identifier-naming.ProtectedMemberCase: CamelCase
+  readability-identifier-naming.ProtectedMemberPrefix: m_
+
+  # --------------------------------------------------------------------------
+  # GLOBALS, STATICS, CONSTANTS (g_CamelCase)
+  # --------------------------------------------------------------------------
+  # Global Variables
+  readability-identifier-naming.GlobalVariableCase: CamelCase
+  readability-identifier-naming.GlobalVariablePrefix: g_
+
+  # Static Variables
+  readability-identifier-naming.StaticVariableCase: CamelCase
+  readability-identifier-naming.StaticVariablePrefix: g_
+
+  # Global Constants
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: g_
+
+  # --------------------------------------------------------------------------
+  # TYPES
+  # --------------------------------------------------------------------------
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+
+  # --------------------------------------------------------------------------
+  # MISC SETTINGS
+  # --------------------------------------------------------------------------
+  # Cognitive Complexity
+  readability-function-cognitive-complexity.Threshold: 25
+
+  # Magic Numbers (Ignore 0 and 1)
+  readability-magic-numbers.IgnoredIntegerValues: '0;1'
