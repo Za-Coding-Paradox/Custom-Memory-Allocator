@@ -150,14 +150,14 @@ void SlabRegistry::ShutdownArena() noexcept {
         return nullptr;
       }
 
-      CurrentBlock |= (1ULL << BitPos);
-
       const size_t SlabIndex = (BlockIdx * g_BitsPerBlock) + static_cast<size_t>(BitPos);
 
       if (SlabIndex >= m_DescriptorCount) [[unlikely]] {
         LOG_ALLOCATOR("ERROR", "SlabRegistry: AllocateSlab OOM - Index out of bounds.");
         return nullptr;
       }
+
+      CurrentBlock |= (1ULL << BitPos);
 
       SlabDescriptor& Descriptor = m_DescriptorSpan[SlabIndex];
       Descriptor.ResetSlab();
