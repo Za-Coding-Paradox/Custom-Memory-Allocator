@@ -38,3 +38,5 @@ compile_commands.json
 # --- Clangd Cache (If used) ---
 .cache/
 .clangd/
+.clang-tidy
+.clang-format
