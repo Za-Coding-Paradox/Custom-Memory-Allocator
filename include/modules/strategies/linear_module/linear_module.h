@@ -1,21 +1,13 @@
 #pragma once
 
-#include <algorithm>
 #include <modules/allocation_stats.h>
 #include <modules/strategies/linear_module/linear_strategy.h>
 namespace Allocator {
 
-// Forward Declarations
 template <typename TContext> class LinearModuleThreadGuard;
 
-// =================================================================================================
-// LINEAR STRATEGY MODULE
-// =================================================================================================
 template <typename TContext> class LinearStrategyModule {
 private:
-  // -----------------------------------------------------------------------------------------------
-  // THREAD LOCAL STATE (Fast Path)
-  // -----------------------------------------------------------------------------------------------
   static thread_local SlabDescriptor* g_HeadSlab;
   static thread_local SlabDescriptor* g_ActiveSlab;
 
@@ -25,22 +17,12 @@ private:
   static thread_local size_t g_ThreadPeak;
   static thread_local size_t g_ThreadCount;
 
-  // -----------------------------------------------------------------------------------------------
-  // GLOBAL STATE (Shared)
-  // -----------------------------------------------------------------------------------------------
-  // Definitions moved to .cpp to satisfy Linker
   static std::atomic<SlabRegistry*> g_SlabRegistry;
   static ContextStats g_GlobalStats;
 
-  // -----------------------------------------------------------------------------------------------
-  // THREAD CONTEXT REGISTRY
-  // -----------------------------------------------------------------------------------------------
   static std::mutex g_ContextMutex;
   static std::vector<SlabDescriptor**> g_ThreadHeads;
 
-  // -----------------------------------------------------------------------------------------------
-  // INTERNAL HELPERS
-  // -----------------------------------------------------------------------------------------------
   static void* OverFlowAllocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
   static void GrowSlabChain() noexcept;
 
@@ -73,10 +55,6 @@ public:
   [[nodiscard]] static std::pair<SlabDescriptor*, uintptr_t> GetCurrentState() noexcept
     requires(TContext::IsRewindable);
 };
-
-// =================================================================================================
-// HELPER CLASSES
-// =================================================================================================
 
 template <typename TContext> class LinearModuleThreadGuard {
 public:

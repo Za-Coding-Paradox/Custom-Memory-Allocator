@@ -57,17 +57,17 @@ void AllocatorEngine::ReportError(const char* Msg, std::source_location Loc) con
 }
 
 std::string AllocatorEngine::FormatBytes(size_t Bytes) noexcept {
-  std::stringstream ss;
+  std::stringstream StringStream;
   if (Bytes < g_BytesPerKB) {
-    ss << Bytes << " B";
+    StringStream << Bytes << " B";
   } else if (Bytes < g_BytesPerMB) {
-    ss << std::fixed << std::setprecision(2)
-       << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerKB)) << " KB";
+    StringStream << std::fixed << std::setprecision(2)
+                 << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerKB)) << " KB";
   } else {
-    ss << std::fixed << std::setprecision(2)
-       << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerMB)) << " MB";
+    StringStream << std::fixed << std::setprecision(2)
+                 << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerMB)) << " MB";
   }
-  return ss.str();
+  return StringStream.str();
 }
 
 } // namespace Allocator

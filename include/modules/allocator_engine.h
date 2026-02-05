@@ -26,13 +26,13 @@ public:
       return nullptr;
     }
 
-    void* ptr = LinearStrategyModule<TScope>::Allocate(Size, Alignment);
+    void* Ptr = LinearStrategyModule<TScope>::Allocate(Size, Alignment);
 
-    if (ptr == nullptr) [[unlikely]] {
+    if (Ptr == nullptr) [[unlikely]] {
       ReportError("Allocation failed (OOM)", std::source_location::current());
     }
 
-    return ptr;
+    return Ptr;
   }
 
   template <typename T, typename TScope>
@@ -41,13 +41,12 @@ public:
     static_assert(TScope::SupportsHandles,
                   "Allocator Violation: This Scope/Strategy does not support Handles.");
 
-    void* memory = Allocate<TScope>(sizeof(T), alignof(T));
+    void* Memory = Allocate<TScope>(sizeof(T), alignof(T));
 
-    if (memory == nullptr) [[unlikely]] {
-      return INVALID_HANDLE;
+    if (Memory == nullptr) [[unlikely]] {
+      return g_InvalidHandle;
     }
-
-    return m_HandleTable.Allocate(memory);
+    return m_HandleTable.Allocate(Memory);
   }
 
   template <typename T>
@@ -58,7 +57,6 @@ public:
   bool FreeHandle(Handle InHandle) noexcept { return m_HandleTable.Free(InHandle); }
 
   template <typename TScope> void Reset() noexcept {
-    // Runtime check: Ensure we don't reset a rewindable scope incorrectly
     if constexpr (TScope::IsRewindable) {
       ReportError("Attempted to Reset() a Rewindable Scope. Use RestoreState() instead.",
                   std::source_location::current());
@@ -81,13 +79,13 @@ public:
   template <typename TScope> void PrintStats(const char* ScopeName) const noexcept {
     LinearStrategyModule<TScope>::FlushThreadStats();
 
-    ContextStats::Snapshot snap = LinearStrategyModule<TScope>::GetGlobalStats().GetSnapshot();
+    ContextStats::Snapshot Snap = LinearStrategyModule<TScope>::GetGlobalStats().GetSnapshot();
 
     std::cout << "\n[" << ScopeName << " Stats]\n";
-    std::cout << "  Allocated : " << FormatBytes(snap.Allocated) << "\n";
-    std::cout << "  Current   : " << FormatBytes(snap.Current) << "\n";
-    std::cout << "  Peak      : " << FormatBytes(snap.Peak) << "\n";
-    std::cout << "  Count     : " << snap.Count << "\n";
+    std::cout << "  Allocated : " << FormatBytes(Snap.Allocated) << "\n";
+    std::cout << "  Current   : " << FormatBytes(Snap.Current) << "\n";
+    std::cout << "  Peak      : " << FormatBytes(Snap.Peak) << "\n";
+    std::cout << "  Count     : " << Snap.Count << "\n";
   }
 
   void GenerateFullReport() const noexcept;
