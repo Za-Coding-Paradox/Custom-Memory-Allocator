@@ -1,4 +1,4 @@
----
+.---
 # Enable checks for:
 # - Bugprone: Common bugs (use-after-free, narrowing conversions, etc.)
 # - Modernize: Suggests C++20 features (auto, nullptr, override, etc.)
@@ -15,27 +15,89 @@ Checks: >
   misc-*,
   -modernize-use-trailing-return-type,
   -readability-identifier-length,
-  -readability-magic-numbers,
   -llvmlibc-*
 
 # header-filter regex to ensure it checks your source files but ignores system libs
 HeaderFilterRegex: 'src/.*|include/.*'
 
 CheckOptions:
-  # Enforce variable naming (camelBack)
-  - key:             readability-identifier-naming.VariableCase
-    value:           camelBack
-  # Enforce function naming (CamelCase)
+  # ----------------------------------------------------------------------------
+  # FUNCTION & VARIABLE NAMING (CamelCase)
+  # ----------------------------------------------------------------------------
+  # Functions: CamelCase (e.g., AllocateMemory)
   - key:             readability-identifier-naming.FunctionCase
     value:           CamelCase
-  # Enforce private member naming (m_ prefix is common, or just camelBack_)
-  - key:             readability-identifier-naming.PrivateMemberSuffix
-    value:           _
-  - key:             readability-identifier-naming.StructCase
+  
+  # Local Variables: CamelCase (e.g., SlabIndex)
+  - key:             readability-identifier-naming.LocalVariableCase
     value:           CamelCase
+  
+  # Parameters: CamelCase (e.g., AllocationSize)
+  - key:             readability-identifier-naming.ParameterCase
+    value:           CamelCase
+
+  # ----------------------------------------------------------------------------
+  # CLASS MEMBER NAMING
+  # ----------------------------------------------------------------------------
+  # Private Members: m_CamelCase (e.g., m_Registry)
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.PrivateMemberPrefix
+    value:           m_
+  
+  # Public Members: p_CamelCase (e.g., p_UserData)
+  # Note: Standard C++ structs often use just CamelCase, but enforcing p_ per request
+  - key:             readability-identifier-naming.PublicMemberCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.PublicMemberPrefix
+    value:           p_
+
+  # Protected Members: m_CamelCase (Treating same as private for consistency)
+  - key:             readability-identifier-naming.ProtectedMemberCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.ProtectedMemberPrefix
+    value:           m_
+
+  # ----------------------------------------------------------------------------
+  # GLOBALS, STATICS, CONSTANTS (g_CamelCase)
+  # ----------------------------------------------------------------------------
+  # Global Variables: g_CamelCase
+  - key:             readability-identifier-naming.GlobalVariableCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.GlobalVariablePrefix
+    value:           g_
+
+  # Static Variables (Function-local or Class-static): g_CamelCase
+  - key:             readability-identifier-naming.StaticVariableCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.StaticVariablePrefix
+    value:           g_
+
+  # Global Constants: g_CamelCase
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.GlobalConstantPrefix
+    value:           g_
+
+  # ----------------------------------------------------------------------------
+  # TYPES
+  # ----------------------------------------------------------------------------
+  # Classes/Structs: CamelCase
   - key:             readability-identifier-naming.ClassCase
     value:           CamelCase
-  # Modernize: reasonable complexity limits
+  - key:             readability-identifier-naming.StructCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.TemplateParameterCase
+    value:           CamelCase
+
+  # ----------------------------------------------------------------------------
+  # MISC SETTINGS
+  # ----------------------------------------------------------------------------
+  # Cognitive Complexity Threshold
   - key:             readability-function-cognitive-complexity.Threshold
     value:           25
+  
+  # Magic Numbers: Ignore simple 0 and 1, but flag everything else
+  - key:             readability-magic-numbers.IgnoredIntegerValues
+    value:           '0;1'
 ...
