@@ -1,23 +1,25 @@
-#include <modules/allocator_engine.h>
 #include <modules/strategies/linear_module/linear_module.h>
 
 namespace Allocator {
 
+// Static definitions
 template <typename TContext>
 thread_local SlabDescriptor* LinearStrategyModule<TContext>::g_HeadSlab = nullptr;
-
 template <typename TContext>
 thread_local SlabDescriptor* LinearStrategyModule<TContext>::g_ActiveSlab = nullptr;
-
 template <typename TContext>
 thread_local LinearModuleThreadGuard<TContext> LinearStrategyModule<TContext>::g_ThreadGuard;
-
 template <typename TContext>
 thread_local size_t LinearStrategyModule<TContext>::g_ThreadAllocated = 0;
-
 template <typename TContext> thread_local size_t LinearStrategyModule<TContext>::g_ThreadPeak = 0;
-
 template <typename TContext> thread_local size_t LinearStrategyModule<TContext>::g_ThreadCount = 0;
+
+template <typename TContext>
+std::atomic<SlabRegistry*> LinearStrategyModule<TContext>::g_SlabRegistry{nullptr};
+template <typename TContext> ContextStats LinearStrategyModule<TContext>::g_GlobalStats;
+template <typename TContext> std::mutex LinearStrategyModule<TContext>::g_ContextMutex;
+template <typename TContext>
+std::vector<SlabDescriptor**> LinearStrategyModule<TContext>::g_ThreadHeads;
 
 template <typename TContext>
 void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept {
@@ -27,25 +29,20 @@ void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInst
 
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept {
   FlushThreadStats();
-
   UnregisterThreadContext();
 
   SlabRegistry* registry = g_SlabRegistry.load(std::memory_order_acquire);
-
   if (!registry) {
     g_HeadSlab = nullptr;
     g_ActiveSlab = nullptr;
     return;
   }
 
-  size_t FreedCount = 0;
   SlabDescriptor* Current = g_HeadSlab;
-
   while (Current) {
     SlabDescriptor* Next = Current->GetNextSlab();
     registry->FreeSlab(Current);
     Current = Next;
-    FreedCount++;
   }
 
   g_HeadSlab = nullptr;
@@ -53,15 +50,13 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownSystem() noexcept {
-  LOG_ALLOCATOR("WARN", "LinearModule: System Shutdown Initiated. Cleaning all threads.");
+  LOG_ALLOCATOR("WARN", "LinearModule: System Shutdown Initiated.");
 
   SlabRegistry* registry = g_SlabRegistry.exchange(nullptr, std::memory_order_acq_rel);
-
   if (!registry)
     return;
 
   std::lock_guard<std::mutex> lock(g_ContextMutex);
-
   for (SlabDescriptor** threadHeadPtr : g_ThreadHeads) {
     if (!threadHeadPtr || !(*threadHeadPtr))
       continue;
@@ -72,7 +67,6 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownSystem
       registry->FreeSlab(current);
       current = next;
     }
-
     *threadHeadPtr = nullptr;
   }
 
@@ -81,21 +75,40 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownSystem
 }
 
 template <typename TContext>
+void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
+                                                       size_t AllocationAlignment) noexcept {
+  SlabDescriptor* NextSlab = g_ActiveSlab->GetNextSlab();
+
+  if (NextSlab) {
+    g_ActiveSlab = NextSlab;
+
+    LinearStrategy::RewindToMarker(*g_ActiveSlab, g_ActiveSlab->GetSlabStart());
+    g_ActiveSlab->SetActiveSlots(0);
+
+    if (LinearStrategy::CanFit(*g_ActiveSlab, AllocationSize)) {
+      return LinearStrategy::Allocate(*g_ActiveSlab, AllocationSize, AllocationAlignment);
+    }
+    return OverFlowAllocate(AllocationSize, AllocationAlignment);
+  }
+
+  GrowSlabChain();
+  if (!g_ActiveSlab || (g_ActiveSlab == NextSlab))
+    return nullptr;
+
+  return Allocate(AllocationSize, AllocationAlignment);
+}
+
+template <typename TContext>
 void* LinearStrategyModule<TContext>::Allocate(size_t AllocationSize,
                                                size_t AllocationAlignment) noexcept {
+  (void)g_ThreadGuard;
 
-  if (AllocationSize > g_ConstSlabSize) [[unlikely]] {
-    LOG_ALLOCATOR("ERROR", "LinearModule: Allocation size too large.");
+  if (AllocationSize > g_ConstSlabSize) [[unlikely]]
     return nullptr;
-  }
-
-  if (!g_ActiveSlab) [[unlikely]] {
+  if (!g_ActiveSlab) [[unlikely]]
     GrowSlabChain();
-  }
-
-  if (!g_ActiveSlab) [[unlikely]] {
+  if (!g_ActiveSlab) [[unlikely]]
     return nullptr;
-  }
 
   void* ptr = nullptr;
   if (LinearStrategy::CanFit(*g_ActiveSlab, AllocationSize)) {
@@ -110,53 +123,23 @@ void* LinearStrategyModule<TContext>::Allocate(size_t AllocationSize,
     if (g_ThreadAllocated > g_ThreadPeak)
       g_ThreadPeak = g_ThreadAllocated;
   }
-
   return ptr;
-}
-
-template <typename TContext>
-void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
-                                                       size_t AllocationAlignment) noexcept {
-
-  SlabDescriptor* NextSlab = g_ActiveSlab->GetNextSlab();
-
-  if (NextSlab) {
-    g_ActiveSlab = NextSlab;
-    LinearStrategy::RewindToMarker(*g_ActiveSlab, g_ActiveSlab->GetSlabStart());
-    g_ActiveSlab->SetActiveSlots(0);
-
-    if (LinearStrategy::CanFit(*g_ActiveSlab, AllocationSize)) {
-      return LinearStrategy::Allocate(*g_ActiveSlab, AllocationSize);
-    }
-    return OverFlowAllocate(AllocationSize, AllocationAlignment);
-  }
-
-  GrowSlabChain();
-
-  if (!g_ActiveSlab || (g_ActiveSlab == NextSlab))
-    return nullptr;
-
-  return Allocate(AllocationSize, AllocationAlignment);
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain() noexcept {
   SlabRegistry* registry = g_SlabRegistry.load(std::memory_order_acquire);
-
-  if (!registry) [[unlikely]] {
+  if (!registry) [[unlikely]]
     return;
-  }
 
   SlabDescriptor* NewSlab = registry->AllocateSlab();
-  if (!NewSlab) [[unlikely]] {
+  if (!NewSlab) [[unlikely]]
     return;
-  }
 
   NewSlab->SetNextSlab(nullptr);
 
   if (!g_HeadSlab) {
     g_HeadSlab = NewSlab;
     g_ActiveSlab = NewSlab;
-
     RegisterThreadContext();
   } else {
     g_ActiveSlab->SetNextSlab(NewSlab);
@@ -180,7 +163,6 @@ void LinearStrategyModule<TContext>::Reset() noexcept
   requires(!TContext::IsRewindable)
 {
   if (g_HeadSlab) {
-    // Lazy Reset: Keep slabs, just reset pointers
     SlabDescriptor* NextSlab = g_HeadSlab->GetNextSlab();
     LinearStrategy::Reset(*g_HeadSlab);
     g_HeadSlab->SetNextSlab(NextSlab);
@@ -267,6 +249,7 @@ template <typename TContext> void LinearStrategyModule<TContext>::FlushThreadSta
 
 } // namespace Allocator
 
+// Instantiations
 namespace Allocator {
 template class LinearStrategyModule<FrameLoad>;
 template class LinearStrategyModule<LevelLoad>;

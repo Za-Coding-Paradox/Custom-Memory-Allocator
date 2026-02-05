@@ -3,13 +3,13 @@
 namespace Allocator {
 
 namespace {
-constexpr size_t k_DefaultHandleCapacity = 1024;
-constexpr size_t k_BytesPerKB = 1024;
-constexpr size_t k_BytesPerMB = 1024 * 1024;
+constexpr size_t g_DefaultHandleCapacity = 1024;
+constexpr size_t g_BytesPerKB = 1024;
+constexpr size_t g_BytesPerMB = 1024 * 1024;
 } // namespace
 
 AllocatorEngine::AllocatorEngine(size_t SlabSize, size_t ArenaSize)
-    : m_Registry(SlabSize, ArenaSize), m_HandleTable(k_DefaultHandleCapacity) {}
+    : m_Registry(SlabSize, ArenaSize), m_HandleTable(g_DefaultHandleCapacity) {}
 
 AllocatorEngine::~AllocatorEngine() { Shutdown(); }
 
@@ -27,6 +27,10 @@ void AllocatorEngine::Shutdown() {
   LinearStrategyModule<FrameLoad>::ShutdownModule();
   LinearStrategyModule<LevelLoad>::ShutdownModule();
   LinearStrategyModule<GlobalLoad>::ShutdownModule();
+
+  LinearStrategyModule<FrameLoad>::ShutdownSystem();
+  LinearStrategyModule<LevelLoad>::ShutdownSystem();
+  LinearStrategyModule<GlobalLoad>::ShutdownSystem();
 
   m_HandleTable.Clear();
 }
@@ -54,14 +58,14 @@ void AllocatorEngine::ReportError(const char* Msg, std::source_location Loc) con
 
 std::string AllocatorEngine::FormatBytes(size_t Bytes) noexcept {
   std::stringstream ss;
-  if (Bytes < k_BytesPerKB) {
+  if (Bytes < g_BytesPerKB) {
     ss << Bytes << " B";
-  } else if (Bytes < k_BytesPerMB) {
+  } else if (Bytes < g_BytesPerMB) {
     ss << std::fixed << std::setprecision(2)
-       << (static_cast<double>(Bytes) / static_cast<double>(k_BytesPerKB)) << " KB";
+       << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerKB)) << " KB";
   } else {
     ss << std::fixed << std::setprecision(2)
-       << (static_cast<double>(Bytes) / static_cast<double>(k_BytesPerMB)) << " MB";
+       << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerMB)) << " MB";
   }
   return ss.str();
 }

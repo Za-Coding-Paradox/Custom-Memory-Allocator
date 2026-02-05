@@ -16,6 +16,7 @@
 #include <list>
 #include <memory>
 #include <mutex> // FIX: Added for thread safety fixes
+#include <new>
 #include <ranges>
 #include <source_location>
 #include <span>

@@ -1,15 +1,21 @@
 #pragma once
 
+#include <algorithm>
+#include <modules/allocation_stats.h>
 #include <modules/strategies/linear_module/linear_strategy.h>
-
 namespace Allocator {
 
-struct ContextStats;
-
+// Forward Declarations
 template <typename TContext> class LinearModuleThreadGuard;
 
+// =================================================================================================
+// LINEAR STRATEGY MODULE
+// =================================================================================================
 template <typename TContext> class LinearStrategyModule {
 private:
+  // -----------------------------------------------------------------------------------------------
+  // THREAD LOCAL STATE (Fast Path)
+  // -----------------------------------------------------------------------------------------------
   static thread_local SlabDescriptor* g_HeadSlab;
   static thread_local SlabDescriptor* g_ActiveSlab;
 
@@ -19,13 +25,22 @@ private:
   static thread_local size_t g_ThreadPeak;
   static thread_local size_t g_ThreadCount;
 
-  static inline std::atomic<SlabRegistry*> g_SlabRegistry{nullptr};
-
+  // -----------------------------------------------------------------------------------------------
+  // GLOBAL STATE (Shared)
+  // -----------------------------------------------------------------------------------------------
+  // Definitions moved to .cpp to satisfy Linker
+  static std::atomic<SlabRegistry*> g_SlabRegistry;
   static ContextStats g_GlobalStats;
 
-  static inline std::mutex g_ContextMutex;
-  static inline std::vector<SlabDescriptor**> g_ThreadHeads;
+  // -----------------------------------------------------------------------------------------------
+  // THREAD CONTEXT REGISTRY
+  // -----------------------------------------------------------------------------------------------
+  static std::mutex g_ContextMutex;
+  static std::vector<SlabDescriptor**> g_ThreadHeads;
 
+  // -----------------------------------------------------------------------------------------------
+  // INTERNAL HELPERS
+  // -----------------------------------------------------------------------------------------------
   static void* OverFlowAllocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
   static void GrowSlabChain() noexcept;
 
@@ -39,9 +54,7 @@ public:
   LinearStrategyModule() = delete;
 
   static void InitializeModule(SlabRegistry* RegistryInstance) noexcept;
-
   static void ShutdownModule() noexcept;
-
   static void ShutdownSystem() noexcept;
 
   [[nodiscard]] static void* Allocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
@@ -61,13 +74,16 @@ public:
     requires(TContext::IsRewindable);
 };
 
+// =================================================================================================
+// HELPER CLASSES
+// =================================================================================================
+
 template <typename TContext> class LinearModuleThreadGuard {
 public:
   LinearModuleThreadGuard() = default;
 
   ~LinearModuleThreadGuard() noexcept {
     LinearStrategyModule<TContext>::FlushThreadStats();
-
     if (LinearStrategyModule<TContext>::g_HeadSlab != nullptr) {
       LinearStrategyModule<TContext>::ShutdownModule();
     }

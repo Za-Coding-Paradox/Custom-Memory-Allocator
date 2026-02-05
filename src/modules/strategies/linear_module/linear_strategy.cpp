@@ -25,13 +25,13 @@ void* LinearStrategy::Allocate(SlabDescriptor& AllocationSlab, size_t Allocation
                                size_t Alignment) noexcept {
 
   const uintptr_t CurrentHead = AllocationSlab.GetFreeListHead();
-  const uintptr_t SlabStart = AllocationSlab.GetSlabStart();
 
   const uintptr_t AlignedDataStart =
       std::bit_cast<uintptr_t>(Utility::AlignForward(std::bit_cast<void*>(CurrentHead), Alignment));
 
   const uintptr_t NewFreeListHead = AlignedDataStart + static_cast<uintptr_t>(AllocationSize);
 
+  const uintptr_t SlabStart = AllocationSlab.GetSlabStart();
   const size_t SlabSize = g_ConstSlabSize;
   const uintptr_t SlabEnd = SlabStart + static_cast<uintptr_t>(SlabSize);
 
@@ -42,10 +42,9 @@ void* LinearStrategy::Allocate(SlabDescriptor& AllocationSlab, size_t Allocation
     return nullptr;
   }
 
+  // 6. Commit
   AllocationSlab.UpdateFreeListHead(NewFreeListHead);
-
-  LOG_ALLOCATOR("DEBUG", "LinearStrategy: Allocated - " << AllocationSize << " bytes @ "
-                                                        << std::bit_cast<void*>(AlignedDataStart));
+  AllocationSlab.IncrementActiveSlots();
 
   return std::bit_cast<void*>(AlignedDataStart);
 }
@@ -60,7 +59,7 @@ void LinearStrategy::Free(SlabDescriptor& SlabToFree, void* MemoryAddress) noexc
 void LinearStrategy::Reset(SlabDescriptor& SlabToReset) noexcept {
   LOG_ALLOCATOR("DEBUG", "LinearStrategy: Resetting Slab - Address: "
                              << std::bit_cast<void*>(SlabToReset.GetSlabStart()));
-
+  SlabToReset.UpdateFreeListHead(SlabToReset.GetSlabStart());
   SlabToReset.ResetSlab();
 }
 
