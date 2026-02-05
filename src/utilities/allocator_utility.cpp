@@ -103,19 +103,4 @@ namespace Allocator {
   const auto AddressVal = std::bit_cast<uintptr_t>(Address);
   return AddressVal != 0 && (AddressVal & (AddressVal - 1)) == 0;
 }
-
-// --- Handle Packing Implementation ---
-
-[[nodiscard]] auto Utility::PackHandle(size_t Index, size_t Generation) noexcept -> size_t {
-  return (Generation << g_GenerationShiftKey) | (Index & g_MaximumBitMask);
-}
-
-[[nodiscard]] auto Utility::UnpackHandleIndex(size_t HandleID) noexcept -> size_t {
-  return HandleID & g_MaximumBitMask;
-}
-
-[[nodiscard]] auto Utility::UnpackHandleGeneration(size_t HandleID) noexcept -> size_t {
-  return HandleID >> g_GenerationShiftKey;
-}
-
 } // namespace Allocator
