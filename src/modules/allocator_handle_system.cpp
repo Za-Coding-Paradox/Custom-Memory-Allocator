@@ -27,15 +27,18 @@ HandleMetadata::HandleMetadata() noexcept : Pointer(nullptr), Generation(1), Nex
 HandleTable::HandleTable(uint32_t InitialCapacity) noexcept
     : m_FreeListHead(0), m_Capacity(0), m_ActiveCount(0) {
 
-  InitialCapacity = std::max(uint32_t(16), std::min(InitialCapacity, MAX_CAPACITY));
+  m_Metadata.reserve(MAX_CAPACITY);
 
-  m_Metadata.resize(InitialCapacity);
+  const uint32_t ClampedCapacity = std::max(uint32_t(16), std::min(InitialCapacity, MAX_CAPACITY));
 
-  InitializeFreeList(0, InitialCapacity);
+  m_Metadata.resize(ClampedCapacity);
 
-  m_Capacity.store(InitialCapacity, std::memory_order_release);
+  InitializeFreeList(0, ClampedCapacity);
 
-  LOG_ALLOCATOR("INFO", "HandleTable: Initialized with capacity " << InitialCapacity);
+  m_Capacity.store(ClampedCapacity, std::memory_order_release);
+
+  LOG_ALLOCATOR("INFO", "HandleTable: Initialized with capacity "
+                            << ClampedCapacity << " (Reserved Max: " << g_MaxCapacity << ")");
 }
 
 void HandleTable::InitializeFreeList(uint32_t Start, uint32_t End) noexcept {

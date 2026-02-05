@@ -88,7 +88,7 @@ public:
   }
   template <typename T, typename TContext>
   [[nodiscard]] TypedHandle<T> AllocateWithHandle(size_t Count = 1) noexcept
-    requires(TContext::SupportHandles)
+    requires(TContext::SupportsHandles)
   {
 
     size_t totalSize = sizeof(T) * Count;
