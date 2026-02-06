@@ -1,10 +1,7 @@
 #pragma once
 
-#include <atomic>
 #include <modules/allocation_stats.h>
 #include <modules/strategies/linear_module/linear_strategy.h>
-#include <mutex>
-#include <vector>
 
 namespace Allocator {
 
