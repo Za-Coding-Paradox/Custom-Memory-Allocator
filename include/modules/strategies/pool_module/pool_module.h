@@ -34,6 +34,7 @@ private:
 
     static thread_local SlabDescriptor* g_ActiveSlab;
     static thread_local SlabDescriptor* g_HeadSlab;
+    static thread_local SlabDescriptor* g_FirstNonFullSlab;
     static thread_local PoolModuleThreadGuard<TContext> g_ThreadGuard;
 
     static std::atomic<SlabRegistry*> g_SlabRegistry;

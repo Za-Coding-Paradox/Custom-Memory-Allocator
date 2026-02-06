@@ -159,7 +159,11 @@ void SlabRegistry::ShutdownArena() noexcept
 
 [[nodiscard]] SlabDescriptor* SlabRegistry::AllocateSlab() noexcept
 {
-    for (size_t Index = 0; Index < m_BitMapSizeInWords; ++Index) {
+    size_t StartIndex = m_SearchHint.load(std::memory_order_relaxed);
+
+    for (size_t i = 0; i < m_BitMapSizeInWords; ++i) {
+        size_t Index = (StartIndex + i) % m_BitMapSizeInWords;
+
         uint64_t CurrentWord = m_BitMap[Index].load(std::memory_order_relaxed);
         if (CurrentWord == ~0ULL) {
             continue;
@@ -176,10 +180,13 @@ void SlabRegistry::ShutdownArena() noexcept
             if (static_cast<bool>(m_BitMap[Index].compare_exchange_weak(
                     CurrentWord, CurrentWord | Mask, std::memory_order_acquire,
                     std::memory_order_relaxed))) {
+
                 size_t SlabIndex = (Index * 64) + static_cast<size_t>(BitIndex);
                 if (SlabIndex >= m_DescriptorCount) {
                     return nullptr;
                 }
+
+                m_SearchHint.store(Index, std::memory_order_relaxed);
 
                 SlabDescriptor* Slab = std::launder(&m_DescriptorSpan[SlabIndex]);
                 Slab->ResetSlab();

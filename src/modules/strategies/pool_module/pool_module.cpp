@@ -9,6 +9,9 @@ template <typename TContext>
 thread_local SlabDescriptor* PoolModule<TContext>::g_HeadSlab = nullptr;
 
 template <typename TContext>
+thread_local SlabDescriptor* PoolModule<TContext>::g_FirstNonFullSlab = nullptr;
+
+template <typename TContext>
 thread_local PoolModuleThreadGuard<TContext> PoolModule<TContext>::g_ThreadGuard;
 
 template <typename TContext>
@@ -44,13 +47,20 @@ template <typename TContext> [[nodiscard]] void* PoolModule<TContext>::Allocate(
     }
 
     if (AllocatedBlock == nullptr) {
-        SlabDescriptor* CurrentSlab = g_HeadSlab;
+        SlabDescriptor* CurrentSlab =
+            (g_FirstNonFullSlab != nullptr) ? g_FirstNonFullSlab : g_HeadSlab;
+
         while (CurrentSlab != nullptr) {
             if (PoolStrategy::CanFit(*CurrentSlab)) {
                 g_ActiveSlab = CurrentSlab;
+                g_FirstNonFullSlab = CurrentSlab;
                 AllocatedBlock = PoolStrategy::Allocate(*g_ActiveSlab);
                 break;
             }
+            if (g_FirstNonFullSlab == CurrentSlab) {
+                g_FirstNonFullSlab = CurrentSlab->GetNextSlab();
+            }
+
             CurrentSlab = CurrentSlab->GetNextSlab();
         }
     }
@@ -59,6 +69,7 @@ template <typename TContext> [[nodiscard]] void* PoolModule<TContext>::Allocate(
         GrowSlabChain();
         if (g_ActiveSlab != nullptr) {
             AllocatedBlock = PoolStrategy::Allocate(*g_ActiveSlab);
+            g_FirstNonFullSlab = g_ActiveSlab;
         }
     }
 
@@ -170,6 +181,7 @@ template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcep
 
     g_HeadSlab = nullptr;
     g_ActiveSlab = nullptr;
+    g_FirstNonFullSlab = nullptr;
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcept

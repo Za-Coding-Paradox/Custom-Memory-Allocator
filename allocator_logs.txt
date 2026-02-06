@@ -4,16 +4,16 @@
 ║     Objective: Break, Stress, and Validate Every Component   ║
 ╚══════════════════════════════════════════════════════════════╝
 
-[==========] Running 33 tests from 3 test suites.
+[==========] Running 38 tests from 3 test suites.
 [----------] Global test environment set-up.
-[----------] 29 tests from AllocatorEngineTest
+[----------] 34 tests from AllocatorEngineTest
 [ RUN      ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads
 === HIGH-FREQUENCY THRASHING ===
 Total Allocations: 16000000
 Total Failures: 0
-Time: 549865038 ns
-Nanoseconds per Allocation: 34.3666 ns
-[       OK ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads (550 ms)
+Time: 538432600 ns
+Nanoseconds per Allocation: 33.652 ns
+[       OK ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads (538 ms)
 [ RUN      ] AllocatorEngineTest.SlowLeak_99PercentFree_VerifyShutdown
 === SLOW LEAK TEST ===
 Leaked: 100 objects (Intentional)
@@ -26,13 +26,13 @@ Successful Slab Acquisitions: 32
 [ RUN      ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover
 === SLAB EXHAUSTION ===
 Allocated 2046 blocks before OOM
-[       OK ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover (10 ms)
+[       OK ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover (9 ms)
 [ RUN      ] AllocatorEngineTest.CacheThrashing_RandomSizedAllocations
 === CACHE THRASHING ===
 Random allocations: 100000
-Time: 22747 μs
-μs per allocation: 0.22747
-[       OK ] AllocatorEngineTest.CacheThrashing_RandomSizedAllocations (22 ms)
+Time: 24935 μs
+μs per allocation: 0.24935
+[       OK ] AllocatorEngineTest.CacheThrashing_RandomSizedAllocations (25 ms)
 [ RUN      ] AllocatorEngineTest.ThreadSafety_MultipleContexts_NoDataRaces
 [       OK ] AllocatorEngineTest.ThreadSafety_MultipleContexts_NoDataRaces (13 ms)
 [ RUN      ] AllocatorEngineTest.ZeroByteAllocation_MustReturnNull
@@ -82,22 +82,32 @@ Pool Allocations: 2000
 Allocated 5000 handles
 [       OK ] AllocatorEngineTest.HandleTable_GrowthUnderPressure (1 ms)
 [ RUN      ] AllocatorEngineTest.FrameLoad_ResetUnderLoad
-[       OK ] AllocatorEngineTest.FrameLoad_ResetUnderLoad (11 ms)
+[       OK ] AllocatorEngineTest.FrameLoad_ResetUnderLoad (10 ms)
 [ RUN      ] AllocatorEngineTest.GlobalLoad_LongLivedAllocations
 [       OK ] AllocatorEngineTest.GlobalLoad_LongLivedAllocations (0 ms)
 [ RUN      ] AllocatorEngineTest.UtilityFunctions_AlignmentCalculations
 [       OK ] AllocatorEngineTest.UtilityFunctions_AlignmentCalculations (0 ms)
 [ RUN      ] AllocatorEngineTest.BenchmarkComparison_LinearVsPool
 === BENCHMARK COMPARISON ===
-Linear: 108.248 ns/alloc
-Pool:   142.268 ns/alloc
-Ratio:  1.31428x
-[       OK ] AllocatorEngineTest.BenchmarkComparison_LinearVsPool (4 ms)
+Linear: 106.655 ns/alloc
+Pool:   137.295 ns/alloc
+Ratio:  1.28728x
+[       OK ] AllocatorEngineTest.BenchmarkComparison_LinearVsPool (3 ms)
 [ RUN      ] AllocatorEngineTest.Fragmentation_PoolReusePattern
 [       OK ] AllocatorEngineTest.Fragmentation_PoolReusePattern (0 ms)
 [ RUN      ] AllocatorEngineTest.ExtremeSizeRequests_NearSlabLimit
 [       OK ] AllocatorEngineTest.ExtremeSizeRequests_NearSlabLimit (0 ms)
-[----------] 29 tests from AllocatorEngineTest (636 ms total)
+[ RUN      ] AllocatorEngineTest.ComplexTypes_PlacementNew_DestructorCycle
+[       OK ] AllocatorEngineTest.ComplexTypes_PlacementNew_DestructorCycle (0 ms)
+[ RUN      ] AllocatorEngineTest.ExtremeAlignment_ExceedsPageSize
+[       OK ] AllocatorEngineTest.ExtremeAlignment_ExceedsPageSize (0 ms)
+[ RUN      ] AllocatorEngineTest.ExceptionSafety_ConstructorThrow
+[       OK ] AllocatorEngineTest.ExceptionSafety_ConstructorThrow (0 ms)
+[ RUN      ] AllocatorEngineTest.MixedBuckets_InterleavedAllocations
+[       OK ] AllocatorEngineTest.MixedBuckets_InterleavedAllocations (2 ms)
+[ RUN      ] AllocatorEngineTest.LongRunning_GameLoopSimulation
+[       OK ] AllocatorEngineTest.LongRunning_GameLoopSimulation (43 ms)
+[----------] 34 tests from AllocatorEngineTest (672 ms total)
 
 [----------] 3 tests from HandleSystemTest
 [ RUN      ] HandleSystemTest.DoubleFree_SameHandleTwice
@@ -114,5 +124,5 @@ Ratio:  1.31428x
 [----------] 1 test from UtilityTest (0 ms total)
 
 [----------] Global test environment tear-down
-[==========] 33 tests from 3 test suites ran. (636 ms total)
-[  PASSED  ] 33 tests.
+[==========] 38 tests from 3 test suites ran. (672 ms total)
+[  PASSED  ] 38 tests.

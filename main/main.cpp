@@ -835,6 +835,230 @@ TEST_F(AllocatorEngineTest, ExtremeSizeRequests_NearSlabLimit)
     EXPECT_NE(tiny, nullptr);
 }
 
+// ============================================================================
+// CATEGORY V: COMPLEX TYPES & ALIGNMENT (Non-PODs & Hardware Constraints)
+// ============================================================================
+
+struct ComplexObject
+{
+    int* resource;
+    uint64_t magic;
+
+    ComplexObject(int val) : magic(0xCAFEBABE)
+    {
+        resource = new int(val); // Heap allocation to simulate complexity
+    }
+
+    ~ComplexObject()
+    {
+        if (resource) {
+            delete resource;
+            resource = nullptr;
+        }
+        magic = 0xDEADDEAD;
+    }
+};
+
+TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_DestructorCycle)
+{
+    // 1. Allocate raw memory for the object
+    Handle h = m_Engine->AllocateWithHandle<ComplexObject, PoolScope<Bucket64>>();
+    ASSERT_NE(h, g_InvalidHandle);
+
+    void* memory = m_Engine->ResolveHandle<ComplexObject>(h);
+    ASSERT_NE(memory, nullptr);
+
+    // 2. Construct using Placement New
+    ComplexObject* obj = new (memory) ComplexObject(42);
+
+    // 3. Verify state
+    EXPECT_EQ(*obj->resource, 42);
+    EXPECT_EQ(obj->magic, 0xCAFEBABE);
+
+    // 4. Manually call Destructor (Allocator won't do this for you!)
+    obj->~ComplexObject();
+
+    // 5. Verify destruction happened (sanity check)
+    EXPECT_EQ(obj->magic, 0xDEADDEAD);
+
+    // 6. Return memory to pool
+    m_Engine->FreeHandle<PoolScope<Bucket64>>(h);
+}
+
+TEST_F(AllocatorEngineTest, ExtremeAlignment_ExceedsPageSize)
+{
+    // Request 8KB alignment (larger than standard 4KB page)
+    // Slab size is 64KB, so this must fit.
+    const size_t alignment = 8192;
+    const size_t size = 128;
+
+    void* ptr = m_Engine->Allocate<GlobalLoad>(size, alignment);
+    ASSERT_NE(ptr, nullptr);
+
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    EXPECT_EQ(addr % alignment, 0) << "Pointer " << addr << " not aligned to " << alignment;
+
+    // Verify we didn't break the slab boundaries
+    // (Internal check: writing to it shouldn't crash)
+    std::memset(ptr, 0xFF, size);
+
+    // Cleanup
+    LinearStrategyModule<GlobalLoad>::ShutdownModule();
+}
+
+TEST_F(AllocatorEngineTest, ExceptionSafety_ConstructorThrow)
+{
+    struct ThrowingObject
+    {
+        ThrowingObject() { throw std::runtime_error("Construction Failed"); }
+    };
+
+    Handle h = m_Engine->AllocateWithHandle<Bucket64, PoolScope<Bucket64>>();
+    void* mem = m_Engine->ResolveHandle<Bucket64>(h);
+
+    bool exceptionCaught = false;
+    try {
+        new (mem) ThrowingObject();
+    }
+    catch (const std::exception&) {
+        exceptionCaught = true;
+        // User is responsible for freeing memory if constructor fails
+        m_Engine->FreeHandle<PoolScope<Bucket64>>(h);
+    }
+
+    EXPECT_TRUE(exceptionCaught);
+
+    // Verify the handle is actually freed and invalid
+    EXPECT_EQ(m_Engine->ResolveHandle<Bucket64>(h), nullptr);
+}
+
+// ============================================================================
+// CATEGORY VI: CHAOS & FRAGMENTATION (The "Real World" Simulators)
+// ============================================================================
+
+TEST_F(AllocatorEngineTest, MixedBuckets_InterleavedAllocations)
+{
+    // Allocating different sizes causes different Pools (16, 32... 256)
+    // to fight for Slabs from the Registry simultaneously.
+
+    struct Allocation
+    {
+        Handle h;
+        int type; // 0=16, 1=32, 2=64
+    };
+    std::vector<Allocation> allocs;
+    std::mt19937 rng(1337);
+
+    // Phase 1: Allocate Randomly
+    for (int i = 0; i < 5000; ++i) {
+        int type = rng() % 3;
+        Handle h = g_InvalidHandle;
+
+        if (type == 0)
+            h = m_Engine->AllocateWithHandle<Bucket16, PoolScope<Bucket16>>();
+        else if (type == 1)
+            h = m_Engine->AllocateWithHandle<Bucket32, PoolScope<Bucket32>>();
+        else
+            h = m_Engine->AllocateWithHandle<Bucket64, PoolScope<Bucket64>>();
+
+        if (h != g_InvalidHandle) {
+            allocs.push_back({h, type});
+        }
+    }
+
+    // Phase 2: Free Random 50% (Create Swiss Cheese)
+    std::shuffle(allocs.begin(), allocs.end(), rng);
+    size_t victimCount = allocs.size() / 2;
+
+    for (size_t i = 0; i < victimCount; ++i) {
+        Allocation& a = allocs[i];
+        if (a.type == 0)
+            m_Engine->FreeHandle<PoolScope<Bucket16>>(a.h);
+        else if (a.type == 1)
+            m_Engine->FreeHandle<PoolScope<Bucket32>>(a.h);
+        else
+            m_Engine->FreeHandle<PoolScope<Bucket64>>(a.h);
+    }
+
+    // Phase 3: Fill holes
+    for (size_t i = 0; i < victimCount; ++i) {
+        // Should reuse the freed spots
+        Handle h = m_Engine->AllocateWithHandle<Bucket16, PoolScope<Bucket16>>();
+        EXPECT_NE(h, g_InvalidHandle);
+        // Immediately clean up to keep test clean
+        m_Engine->FreeHandle<PoolScope<Bucket16>>(h);
+    }
+
+    // Cleanup remaining
+    for (size_t i = victimCount; i < allocs.size(); ++i) {
+        Allocation& a = allocs[i];
+        if (a.type == 0)
+            m_Engine->FreeHandle<PoolScope<Bucket16>>(a.h);
+        else if (a.type == 1)
+            m_Engine->FreeHandle<PoolScope<Bucket32>>(a.h);
+        else
+            m_Engine->FreeHandle<PoolScope<Bucket64>>(a.h);
+    }
+}
+
+TEST_F(AllocatorEngineTest, LongRunning_GameLoopSimulation)
+{
+    // Simulates a game loop running for "Frames"
+    // Validates that we don't creep up memory usage endlessly
+
+    constexpr int FRAME_COUNT = 1000; // Simulated frames
+    constexpr int OBJECTS_PER_FRAME = 500;
+
+    size_t initialUsage = 0;
+
+    for (int frame = 0; frame < FRAME_COUNT; ++frame) {
+        // 1. Frame Allocations (Short lived)
+        for (int i = 0; i < OBJECTS_PER_FRAME; ++i) {
+            volatile void* ptr = m_Engine->Allocate<FrameLoad>(64);
+            (void)ptr;
+        }
+
+        // 2. Pool Allocations (Medium lived - random survive)
+        std::vector<Handle> persistent;
+        for (int i = 0; i < 50; ++i) {
+            Handle h = m_Engine->AllocateWithHandle<Bucket64, PoolScope<Bucket64>>();
+            if (h != g_InvalidHandle)
+                persistent.push_back(h);
+        }
+
+        // 3. End of Frame: Reset Linear
+        m_Engine->Reset<FrameLoad>();
+
+        // 4. Randomly free some pool objects (Simulation)
+        for (Handle h : persistent) {
+            m_Engine->FreeHandle<PoolScope<Bucket64>>(h);
+        }
+
+        // 5. Periodic Hard Cleanup (simulating level transition)
+        if (frame % 200 == 0) {
+            LinearStrategyModule<FrameLoad>::ShutdownModule();
+        }
+
+        // Snapshot usage at frame 100
+        if (frame == 100) {
+            auto stats = LinearStrategyModule<FrameLoad>::GetGlobalStats().GetSnapshot();
+            initialUsage = stats.Allocated - stats.Freed;
+        }
+
+        // At frame 900, usage should not have exploded relative to frame 100
+        // (Linear allocator reuses slabs, so 'Current' should be stable)
+        if (frame == 900) {
+            auto stats = LinearStrategyModule<FrameLoad>::GetGlobalStats().GetSnapshot();
+            size_t currentUsage = stats.Allocated - stats.Freed;
+            // Allow some fluctuation, but huge growth indicates a leak
+            EXPECT_LT(currentUsage, initialUsage + (1024 * 1024));
+        }
+    }
+
+    // Final Hard Stop
+    LinearStrategyModule<FrameLoad>::ShutdownModule();
+}
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
