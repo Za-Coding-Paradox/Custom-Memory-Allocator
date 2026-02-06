@@ -10,13 +10,12 @@ template <size_t TSize> struct BucketScope
     static constexpr size_t g_BucketSize = TSize;
     static constexpr size_t g_Alignment = TSize;
 
-    static constexpr bool SupportsHandles = true; // Unified naming
-    static constexpr bool IsRewindable = false;   // Unified naming
+    static constexpr bool SupportsHandles = true;
+    static constexpr bool IsRewindable = false;
 };
 
 template <size_t TSize> struct PoolMap
 {
-    // Fixed: conditional_t IS the type, do not use ::Type at the end
     using Type = std::conditional_t<
         TSize <= 16, BucketScope<16>,
         std::conditional_t<TSize <= 32, BucketScope<32>,

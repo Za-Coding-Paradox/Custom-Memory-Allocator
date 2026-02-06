@@ -91,7 +91,11 @@ void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
     if (NextSlab != nullptr) {
         g_ActiveSlab = NextSlab;
 
+        SlabDescriptor* NextOfNext = g_ActiveSlab->GetNextSlab();
+
         LinearStrategy::Reset(*g_ActiveSlab);
+
+        g_ActiveSlab->SetNextSlab(NextOfNext);
 
         return Allocate(AllocationSize, AllocationAlignment);
     }
