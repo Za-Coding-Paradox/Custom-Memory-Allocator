@@ -1,0 +1,28 @@
+flowchart TD
+    Start([User Calls Allocate<TScope>]) --> Traits{ScopeTraits<TScope>::SupportsHandles?}
+    
+    subgraph "Branching Logic"
+    Traits -- NO (Linear Scope) --> LinearPath
+    Traits -- YES (Pool Scope) --> PoolPath
+    end
+
+    subgraph "Linear Path"
+        LinearPath[RawAllocateInternal]
+        LinearPath --> CallLinear[LinearStrategyModule::Allocate]
+        CallLinear --> LinearReturn([Return void*])
+    end
+
+    subgraph "Pool Path"
+        PoolPath[AllocateWithHandle]
+        PoolPath --> CallPool[PoolModule::Allocate]
+        
+        CallPool --> CheckPoolResult{Memory Valid?}
+        CheckPoolResult -- No --> RetInvalid([Return InvalidHandle])
+        CheckPoolResult -- Yes --> CreateHandle[HandleTable::Allocate]
+        CreateHandle --> PoolReturn([Return Handle])
+    end
+    
+    subgraph "Resolve Path"
+        UserResolve([User Calls ResolveHandle]) --> ResolveCall[HandleTable::Resolve]
+        ResolveCall --> RetPtr([Return T*])
+    end

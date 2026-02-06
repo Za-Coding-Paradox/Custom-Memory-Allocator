@@ -1,0 +1,30 @@
+classDiagram
+    class Handle {
+        +uint32 Index
+        +uint32 Generation
+        +GetPacked() uint64
+    }
+
+    class HandleTable {
+        -atomic_uint32 m_FreeListHead
+        -array_atomic_Page_1024 m_Pages
+        +Allocate(void* Ptr) Handle
+        +Resolve(Handle) void*
+        +Free(Handle) bool
+    }
+
+    class HandlePage {
+        +HandleMetadata Entries[1024]
+    }
+
+    class HandleMetadata {
+        +void* Pointer
+        +uint32 Generation
+        +uint32 NextFree
+    }
+
+    HandleTable "1" *-- "1024" HandlePage : Sparse Allocation (Lazy)
+    HandlePage "1" *-- "1024" HandleMetadata : Contains
+    Handle ..> HandleTable : Access
+
+    note for HandleMetadata "Generational Safety:\nIf Handle.Gen != Metadata.Gen\n-> Access Denied (Stale)"
