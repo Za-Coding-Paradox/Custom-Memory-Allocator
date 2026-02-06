@@ -1,0 +1,32 @@
+flowchart TD
+    subgraph "Initialization Phase"
+        Mmap[mmap 64MB] --> Split["Split: Headers | Payload"]
+        Split --> InitBitmap[Init Atomic Bitmap]
+    end
+
+    subgraph "Allocation Logic (AllocateSlab)"
+        StartAlloc([Request Slab]) --> LoadHint[Load m_SearchHint]
+        LoadHint --> Loop[Scan Bitmap Atomic]
+        
+        Loop --> FoundFree{Found 0-bit?}
+        FoundFree -- No --> IncIndex[Increment Index]
+        IncIndex --> CheckWrap{Wrapped Around?}
+        CheckWrap -- No --> Loop
+        CheckWrap -- Yes --> Fail([Return nullptr])
+        
+        FoundFree -- Yes --> CAS{CompareExchange?}
+        CAS -- Fail --> Loop
+        CAS -- Success --> Claim[Mark Bit 1]
+        
+        Claim --> UpdateHint[Update m_SearchHint]
+        UpdateHint --> Launder[std::launder Descriptor]
+        Launder --> ResetDesc[Descriptor->Reset]
+        ResetDesc --> ReturnSlab([Return SlabDescriptor*])
+    end
+
+    subgraph "Memory Layout"
+        direction LR
+        DescRegion[Region 1: SlabDescriptors]
+        Padding[Alignment Padding]
+        SlabRegion[Region 2: 64KB Slab Payloads]
+    end

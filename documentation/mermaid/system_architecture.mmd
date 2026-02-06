@@ -1,0 +1,60 @@
+graph TD
+    subgraph "Client Layer"
+        UserApp[User Application]
+        UserApp -->|1. Request Memory| Engine[AllocatorEngine]
+        UserApp -->|2. Resolve Handle| Engine
+        UserApp -->|3. Free Handle| Engine
+    end
+
+    subgraph "Facade Layer"
+        Engine
+        Traits[ScopeTraits<TScope>]
+        Engine -.->|Check Traits| Traits
+    end
+
+    subgraph "Strategy Layer (Thread-Local)"
+        direction TB
+        
+        subgraph "Linear Allocator (Per-Frame/Level)"
+            LinearMod[LinearStrategyModule]
+            LinearTLS[TLS Context]
+            LinearMod -- Access --> LinearTLS
+            LinearTLS -- Holds --> LinearChain[Active Slab Chain]
+        end
+        
+        subgraph "Pool Allocator (Long-Lived)"
+            PoolMod[PoolModule]
+            PoolTLS[TLS Context]
+            PoolMod -- Access --> PoolTLS
+            PoolTLS -- Holds --> PoolChain[Active Slab Chain]
+            
+            %% Optimization Visualized
+            PoolTLS -- Optimization --> Cursor[g_FirstNonFullSlab]
+        end
+    end
+
+    subgraph "Safety Layer"
+        HandleSys[HandleSystem]
+        HandleTable[HandleTable]
+        HandleSys -- Manages --> HandleTable
+        HandleTable -- Maps ID to Ptr --> PhysicalMem
+    end
+
+    subgraph "Physical Layer (Shared)"
+        Registry[SlabRegistry]
+        Bitmap[Atomic Bitmap]
+        Arena[64MB Monolithic Arena]
+        
+        Registry -- Scans --> Bitmap
+        Registry -- Slices --> Arena
+    end
+
+    %% Interactions
+    Engine -->|Linear Scope| LinearMod
+    Engine -->|Pool Scope| PoolMod
+    Engine -->|Handle Request| HandleSys
+    
+    LinearMod -->|Request Slab| Registry
+    PoolMod -->|Request Slab| Registry
+    
+    HandleSys -.->|Resolve| PoolMod

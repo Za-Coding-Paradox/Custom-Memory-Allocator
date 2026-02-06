@@ -1,0 +1,35 @@
+flowchart TD
+    Start([Allocate 1 Block]) --> TryActive[Try ActiveSlab]
+    
+    TryActive --> ActiveFit{Fits?}
+    ActiveFit -- Yes --> DoAlloc[Mark Slot Used]
+    
+    ActiveFit -- No --> OptPath{Check Cursor g_FirstNonFullSlab}
+    
+    subgraph "Optimization Loop"
+        OptPath -- Valid --> StartCursor[Start Search at Cursor]
+        OptPath -- Null --> StartHead[Start Search at Head]
+        
+        StartCursor --> CheckSlab{Slab Has Space?}
+        StartHead --> CheckSlab
+        
+        CheckSlab -- No (Full) --> AdvanceCursor[Advance Cursor to Next]
+        AdvanceCursor --> MoveNext[Move Current to Next]
+        MoveNext --> LoopCheck{End of Chain?}
+        
+        LoopCheck -- No --> CheckSlab
+        LoopCheck -- Yes --> Grow[Grow Chain]
+    end
+    
+    CheckSlab -- Yes (Found) --> UpdateState[Update g_ActiveSlab]
+    UpdateState --> UpdateOpt[Update g_FirstNonFullSlab]
+    UpdateOpt --> DoAlloc
+    
+    Grow --> NewSlab[Registry->AllocateSlab]
+    NewSlab --> Format[Format Slots]
+    Format --> SetActive[Set as Active]
+    SetActive --> SetCursor[Set Cursor to New]
+    SetCursor --> DoAlloc
+    
+    DoAlloc --> UpdateStats[Update Stats]
+    UpdateStats --> RetPtr([Return void*])

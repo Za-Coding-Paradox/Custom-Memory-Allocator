@@ -1,0 +1,56 @@
+stateDiagram-v2
+    state "Thread Local Storage" as TLS {
+        ActiveSlab
+        HeadSlab
+    }
+
+    [*] --> Idle
+
+    state "Allocation Phase" as Alloc {
+        Idle --> CheckFit : Allocate(Size)
+        
+        state fit_check <<choice>>
+        CheckFit --> fit_check
+        fit_check --> BumpPointer : Fits in ActiveSlab
+        fit_check --> Overflow : Full
+        
+        BumpPointer --> ReturnPtr
+        
+        state "Overflow Handling (The Reuse Logic)" as Overflow {
+            CheckNext : Check Active->NextSlab
+            
+            state next_branch <<choice>>
+            CheckNext --> next_branch
+            
+            next_branch --> Reuse : Next != nullptr (Cached)
+            next_branch --> Grow : Next == nullptr (Empty)
+            
+            state "Reuse Strategy" as Reuse {
+                SaveLink : Save Next->Next
+                ResetActive : Reset(Active)
+                RestoreLink : Restore Next->Next
+                Advance : Active = Next
+            }
+            
+            state "Grow Strategy" as Grow {
+                ReqRegistry : Registry->AllocateSlab()
+                Attach : Active->Next = NewSlab
+                AdvanceNew : Active = NewSlab
+            }
+        }
+    }
+
+    state "Reset Phase (Soft Reset)" as Reset {
+        UserReset --> IterateChain
+        IterateChain --> RewindSlab : Reset(Current)
+        RewindSlab --> PreserveLink : Keep Next Pointer
+        PreserveLink --> MoveNext
+        MoveNext --> Idle : End of Chain
+    }
+
+    state "Shutdown Phase (Hard Return)" as Shutdown {
+        UserShutdown --> IterateAll
+        IterateAll --> FreeToRegistry : Registry->FreeSlab(Current)
+        FreeToRegistry --> IterateAll
+        IterateAll --> [*] : Chain Empty
+    }
