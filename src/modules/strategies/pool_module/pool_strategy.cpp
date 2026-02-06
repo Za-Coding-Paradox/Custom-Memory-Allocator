@@ -2,8 +2,6 @@
 
 namespace Allocator {
 
-// names so amigous i had to write this explaination, ;P
-// is used to check if we have space for atleast two blocks in the slab.
 static const size_t g_AvailableBlocksCheckIncrement = 2;
 static const size_t g_EndOfFreeListMarkerForNoFreeSpaceSlab = 0;
 

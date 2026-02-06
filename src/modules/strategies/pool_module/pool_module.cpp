@@ -73,23 +73,22 @@ template <typename TContext> [[nodiscard]] void* PoolModule<TContext>::Allocate(
 
 template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree) noexcept
 {
-    if (MemoryToFree == nullptr) [[unlikely]] {
+    if (MemoryToFree == nullptr) [[unlikely]]
         return;
-    }
 
     const auto TargetAddress = std::bit_cast<uintptr_t>(MemoryToFree);
     SlabDescriptor* CurrentSlab = g_HeadSlab;
 
     while (CurrentSlab != nullptr) {
         const uintptr_t SlabStart = CurrentSlab->GetSlabStart();
-        const uintptr_t SlabEnd =
-            SlabStart + static_cast<uintptr_t>(CurrentSlab->GetAvailableMemorySize());
+        const uintptr_t SlabEnd = SlabStart + g_ConstSlabSize;
 
         if (TargetAddress >= SlabStart && TargetAddress < SlabEnd) [[likely]] {
             PoolStrategy::Free(*CurrentSlab, MemoryToFree);
+
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
 
-            if (g_ActiveSlab == nullptr || (PoolStrategy::CanFit(*g_ActiveSlab))) {
+            if (g_ActiveSlab == nullptr || !PoolStrategy::CanFit(*g_ActiveSlab)) {
                 g_ActiveSlab = CurrentSlab;
             }
             return;
@@ -199,5 +198,21 @@ template <typename TContext> PoolModuleThreadGuard<TContext>::~PoolModuleThreadG
 {
     PoolModule<TContext>::ShutdownModule();
 }
+
+} // namespace Allocator
+
+namespace Allocator {
+
+template class PoolModule<BucketScope<16>>;
+template class PoolModule<BucketScope<32>>;
+template class PoolModule<BucketScope<64>>;
+template class PoolModule<BucketScope<128>>;
+template class PoolModule<BucketScope<256>>;
+
+template struct PoolModuleThreadGuard<BucketScope<16>>;
+template struct PoolModuleThreadGuard<BucketScope<32>>;
+template struct PoolModuleThreadGuard<BucketScope<64>>;
+template struct PoolModuleThreadGuard<BucketScope<128>>;
+template struct PoolModuleThreadGuard<BucketScope<256>>;
 
 } // namespace Allocator

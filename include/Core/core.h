@@ -17,6 +17,7 @@
 #include <memory>
 #include <mutex> // FIX: Added for thread safety fixes
 #include <new>
+#include <random>
 #include <ranges>
 #include <source_location>
 #include <span>
@@ -41,13 +42,13 @@ namespace Allocator {
 inline std::mutex g_LogMutex;
 }
 
-#define LOG_ALLOCATOR(Level, Message)                                                              \
-  do {                                                                                             \
-    std::ostringstream oss;                                                                        \
-    oss << "[" << Level << "] " << Message << "\n";                                                \
-    std::lock_guard<std::mutex> lock(Allocator::g_LogMutex);                                       \
-    std::cout << oss.str() << std::flush;                                                          \
-  } while (0)
+#define LOG_ALLOCATOR(Level, Message)                            \
+    do {                                                         \
+        std::ostringstream oss;                                  \
+        oss << "[" << Level << "] " << Message << "\n";          \
+        std::lock_guard<std::mutex> lock(Allocator::g_LogMutex); \
+        std::cout << oss.str() << std::flush;                    \
+    } while (0)
 #else
 #define LOG_ALLOCATOR(Level, Message) ((void)0)
 #endif

@@ -11,8 +11,8 @@ const static size_t g_GlobalContextBasedGeneralAlignmentSize = 16;
 template <typename T> struct ScopeTraits
 {
     static constexpr bool SupportsHandles = []() {
-        if constexpr (requires { T::g_SupportsHandles; }) {
-            return T::g_SupportsHandles;
+        if constexpr (requires { T::SupportsHandles; }) {
+            return T::SupportsHandles;
         }
         return false;
     }();
@@ -44,7 +44,6 @@ public:
     {
         static_assert(!ScopeTraits<TScope>::SupportsHandles,
                       "Engine Violation: Use AllocateWithHandle for Pool-based Scopes.");
-
         return RawAllocateInternal<TScope>(Size, Alignment);
     }
 
@@ -54,7 +53,6 @@ public:
                       "Engine Violation: Linear Scopes do not support Handle-based allocation.");
 
         void* Memory = RawAllocateInternal<TScope>(sizeof(T), alignof(T));
-
         if (Memory == nullptr) [[unlikely]] {
             return g_InvalidHandle;
         }
@@ -84,12 +82,13 @@ public:
     {
         static_assert(!ScopeTraits<TScope>::SupportsHandles,
                       "Pools cannot be Reset(); they must be Freed individually.");
+
         if constexpr (ScopeTraits<TScope>::IsRewindable) {
-            ReportError("Reset() failed: Use RestoreState() for Rewindable Scopes.",
-                        std::source_location::current());
-            return;
+            LinearStrategyModule<TScope>::RewindState(nullptr, 0);
         }
-        LinearStrategyModule<TScope>::Reset();
+        else {
+            LinearStrategyModule<TScope>::Reset();
+        }
     }
 
     template <typename TScope>
@@ -122,10 +121,6 @@ private:
         }
         else {
             Ptr = LinearStrategyModule<TScope>::Allocate(Size, Alignment);
-        }
-
-        if (Ptr == nullptr) [[unlikely]] {
-            ReportError("Allocation failed (OOM)", std::source_location::current());
         }
         return Ptr;
     }
