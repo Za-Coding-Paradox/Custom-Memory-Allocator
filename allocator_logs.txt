@@ -1,0 +1,128 @@
+
+╔══════════════════════════════════════════════════════════════╗
+║     ALLOCATOR TORTURE TEST SUITE - 40+ BRUTAL TESTS          ║
+║     Objective: Break, Stress, and Validate Every Component   ║
+╚══════════════════════════════════════════════════════════════╝
+
+[==========] Running 38 tests from 3 test suites.
+[----------] Global test environment set-up.
+[----------] 34 tests from AllocatorEngineTest
+[ RUN      ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads
+=== HIGH-FREQUENCY THRASHING ===
+Total Allocations: 16000000
+Total Failures: 0
+Time: 538432600 ns
+Nanoseconds per Allocation: 33.652 ns
+[       OK ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads (538 ms)
+[ RUN      ] AllocatorEngineTest.SlowLeak_99PercentFree_VerifyShutdown
+=== SLOW LEAK TEST ===
+Leaked: 100 objects (Intentional)
+[       OK ] AllocatorEngineTest.SlowLeak_99PercentFree_VerifyShutdown (3 ms)
+[ RUN      ] AllocatorEngineTest.ContentionStorm_SimultaneousSlabRequests
+=== CONTENTION STORM ===
+Threads: 32
+Successful Slab Acquisitions: 32
+[       OK ] AllocatorEngineTest.ContentionStorm_SimultaneousSlabRequests (1 ms)
+[ RUN      ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover
+=== SLAB EXHAUSTION ===
+Allocated 2046 blocks before OOM
+[       OK ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover (9 ms)
+[ RUN      ] AllocatorEngineTest.CacheThrashing_RandomSizedAllocations
+=== CACHE THRASHING ===
+Random allocations: 100000
+Time: 24935 μs
+μs per allocation: 0.24935
+[       OK ] AllocatorEngineTest.CacheThrashing_RandomSizedAllocations (25 ms)
+[ RUN      ] AllocatorEngineTest.ThreadSafety_MultipleContexts_NoDataRaces
+[       OK ] AllocatorEngineTest.ThreadSafety_MultipleContexts_NoDataRaces (13 ms)
+[ RUN      ] AllocatorEngineTest.ZeroByteAllocation_MustReturnNull
+[       OK ] AllocatorEngineTest.ZeroByteAllocation_MustReturnNull (0 ms)
+[ RUN      ] AllocatorEngineTest.AlignmentNightmare_1ByteAlignment
+[       OK ] AllocatorEngineTest.AlignmentNightmare_1ByteAlignment (0 ms)
+[ RUN      ] AllocatorEngineTest.AlignmentNightmare_128ByteAlignment
+[       OK ] AllocatorEngineTest.AlignmentNightmare_128ByteAlignment (0 ms)
+[ RUN      ] AllocatorEngineTest.AlignmentNightmare_4096ByteAlignment_PageBoundary
+[       OK ] AllocatorEngineTest.AlignmentNightmare_4096ByteAlignment_PageBoundary (0 ms)
+[ RUN      ] AllocatorEngineTest.HandleStaleness_AllocateFreeResolve_MustFail
+[       OK ] AllocatorEngineTest.HandleStaleness_AllocateFreeResolve_MustFail (0 ms)
+[ RUN      ] AllocatorEngineTest.PoolBucketBoundaries_Sizes
+[       OK ] AllocatorEngineTest.PoolBucketBoundaries_Sizes (0 ms)
+[ RUN      ] AllocatorEngineTest.RewindOverreach_Allocate10Slabs_RewindToFirst
+=== REWIND OVERREACH ===
+Rewinding to initial state...
+[       OK ] AllocatorEngineTest.RewindOverreach_Allocate10Slabs_RewindToFirst (7 ms)
+[ RUN      ] AllocatorEngineTest.LinearAllocation_CrossesSlabBoundary
+[       OK ] AllocatorEngineTest.LinearAllocation_CrossesSlabBoundary (0 ms)
+[ RUN      ] AllocatorEngineTest.PeakUsageValidation_SawtoothPattern
+=== PEAK USAGE (SAWTOOTH) ===
+Peak: 193536 bytes
+Current: 65536 bytes
+[       OK ] AllocatorEngineTest.PeakUsageValidation_SawtoothPattern (2 ms)
+[ RUN      ] AllocatorEngineTest.SnapshotIntegrity_ManualVsReportedCurrent
+[       OK ] AllocatorEngineTest.SnapshotIntegrity_ManualVsReportedCurrent (0 ms)
+[ RUN      ] AllocatorEngineTest.Stats_AllocationCountAccuracy
+[       OK ] AllocatorEngineTest.Stats_AllocationCountAccuracy (0 ms)
+[ RUN      ] AllocatorEngineTest.RecursiveOverflow_Force50SlabOverflows
+=== RECURSIVE OVERFLOW ===
+Allocated across 50 slabs
+[       OK ] AllocatorEngineTest.RecursiveOverflow_Force50SlabOverflows (0 ms)
+[ RUN      ] AllocatorEngineTest.MemoryCorruption_WriteToFreedPool
+[       OK ] AllocatorEngineTest.MemoryCorruption_WriteToFreedPool (0 ms)
+[ RUN      ] AllocatorEngineTest.HandleGeneration_Wraparound
+[       OK ] AllocatorEngineTest.HandleGeneration_Wraparound (0 ms)
+[ RUN      ] AllocatorEngineTest.MixedWorkload_LinearAndPool_Concurrent
+=== MIXED WORKLOAD ===
+Linear Allocations: 2000
+Pool Allocations: 2000
+[       OK ] AllocatorEngineTest.MixedWorkload_LinearAndPool_Concurrent (0 ms)
+[ RUN      ] AllocatorEngineTest.RewindStressTest_1000Rewinds
+[       OK ] AllocatorEngineTest.RewindStressTest_1000Rewinds (1 ms)
+[ RUN      ] AllocatorEngineTest.HandleTable_GrowthUnderPressure
+=== HANDLE TABLE GROWTH ===
+Allocated 5000 handles
+[       OK ] AllocatorEngineTest.HandleTable_GrowthUnderPressure (1 ms)
+[ RUN      ] AllocatorEngineTest.FrameLoad_ResetUnderLoad
+[       OK ] AllocatorEngineTest.FrameLoad_ResetUnderLoad (10 ms)
+[ RUN      ] AllocatorEngineTest.GlobalLoad_LongLivedAllocations
+[       OK ] AllocatorEngineTest.GlobalLoad_LongLivedAllocations (0 ms)
+[ RUN      ] AllocatorEngineTest.UtilityFunctions_AlignmentCalculations
+[       OK ] AllocatorEngineTest.UtilityFunctions_AlignmentCalculations (0 ms)
+[ RUN      ] AllocatorEngineTest.BenchmarkComparison_LinearVsPool
+=== BENCHMARK COMPARISON ===
+Linear: 106.655 ns/alloc
+Pool:   137.295 ns/alloc
+Ratio:  1.28728x
+[       OK ] AllocatorEngineTest.BenchmarkComparison_LinearVsPool (3 ms)
+[ RUN      ] AllocatorEngineTest.Fragmentation_PoolReusePattern
+[       OK ] AllocatorEngineTest.Fragmentation_PoolReusePattern (0 ms)
+[ RUN      ] AllocatorEngineTest.ExtremeSizeRequests_NearSlabLimit
+[       OK ] AllocatorEngineTest.ExtremeSizeRequests_NearSlabLimit (0 ms)
+[ RUN      ] AllocatorEngineTest.ComplexTypes_PlacementNew_DestructorCycle
+[       OK ] AllocatorEngineTest.ComplexTypes_PlacementNew_DestructorCycle (0 ms)
+[ RUN      ] AllocatorEngineTest.ExtremeAlignment_ExceedsPageSize
+[       OK ] AllocatorEngineTest.ExtremeAlignment_ExceedsPageSize (0 ms)
+[ RUN      ] AllocatorEngineTest.ExceptionSafety_ConstructorThrow
+[       OK ] AllocatorEngineTest.ExceptionSafety_ConstructorThrow (0 ms)
+[ RUN      ] AllocatorEngineTest.MixedBuckets_InterleavedAllocations
+[       OK ] AllocatorEngineTest.MixedBuckets_InterleavedAllocations (2 ms)
+[ RUN      ] AllocatorEngineTest.LongRunning_GameLoopSimulation
+[       OK ] AllocatorEngineTest.LongRunning_GameLoopSimulation (43 ms)
+[----------] 34 tests from AllocatorEngineTest (672 ms total)
+
+[----------] 3 tests from HandleSystemTest
+[ RUN      ] HandleSystemTest.DoubleFree_SameHandleTwice
+[       OK ] HandleSystemTest.DoubleFree_SameHandleTwice (0 ms)
+[ RUN      ] HandleSystemTest.InvalidHandle_GarbageBitPattern
+[       OK ] HandleSystemTest.InvalidHandle_GarbageBitPattern (0 ms)
+[ RUN      ] HandleSystemTest.InvalidHandle_NullHandle
+[       OK ] HandleSystemTest.InvalidHandle_NullHandle (0 ms)
+[----------] 3 tests from HandleSystemTest (0 ms total)
+
+[----------] 1 test from UtilityTest
+[ RUN      ] UtilityTest.IsPowerOfTwo_Validation
+[       OK ] UtilityTest.IsPowerOfTwo_Validation (0 ms)
+[----------] 1 test from UtilityTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 38 tests from 3 test suites ran. (672 ms total)
+[  PASSED  ] 38 tests.
