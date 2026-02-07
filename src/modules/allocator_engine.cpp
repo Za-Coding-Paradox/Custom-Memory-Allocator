@@ -11,28 +11,49 @@ constexpr size_t g_BytesPerMB = 1024 * 1024;
 
 AllocatorEngine::AllocatorEngine(size_t SlabSize, size_t ArenaSize)
     : m_Registry(SlabSize, ArenaSize), m_HandleTable(g_DefaultHandleCapacity)
-{}
+{
+    LOG_ALLOCATOR("INFO", "Engine: Constructor called. Registry Address: " << &m_Registry);
+}
 
 AllocatorEngine::~AllocatorEngine()
 {
+    LOG_ALLOCATOR("INFO", "Engine: Destructor called.");
     Shutdown();
 }
 
 void AllocatorEngine::Initialize()
 {
+    LOG_ALLOCATOR("SYSTEM", "Engine: Initializing Static Strategy Modules...");
+
+    // Check registry sanity before passing it
+    if (m_Registry.GetArenaSlabsStart() == nullptr) {
+        LOG_ALLOCATOR(
+            "CRITICAL",
+            "Engine: Registry has NULL Slabs Start! Initialization will likely cause Segfault.");
+    }
+
+    // Handover to Linear Modules
+    LOG_ALLOCATOR("DEBUG",
+                  "Engine: Initializing Linear Strategy Modules with Registry: " << &m_Registry);
     LinearStrategyModule<FrameLoad>::InitializeModule(&m_Registry);
     LinearStrategyModule<LevelLoad>::InitializeModule(&m_Registry);
     LinearStrategyModule<GlobalLoad>::InitializeModule(&m_Registry);
 
+    // Handover to Pool Modules
+    LOG_ALLOCATOR("DEBUG", "Engine: Initializing Pool Modules...");
     PoolModule<BucketScope<16>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<32>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<64>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<128>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<256>>::InitializeModule(&m_Registry);
+
+    LOG_ALLOCATOR("SYSTEM", "Engine: Static Handover Complete.");
 }
 
 void AllocatorEngine::Shutdown()
 {
+    LOG_ALLOCATOR("SYSTEM", "Engine: Starting Shutdown...");
+
     LinearStrategyModule<FrameLoad>::ShutdownSystem();
     LinearStrategyModule<LevelLoad>::ShutdownSystem();
     LinearStrategyModule<GlobalLoad>::ShutdownSystem();
@@ -43,12 +64,17 @@ void AllocatorEngine::Shutdown()
     PoolModule<BucketScope<128>>::ShutdownSystem();
     PoolModule<BucketScope<256>>::ShutdownSystem();
 
+    LOG_ALLOCATOR("DEBUG", "Engine: Clearing Handle Table...");
     m_HandleTable.Clear();
+
+    LOG_ALLOCATOR("SYSTEM", "Engine: Shutdown Complete.");
 }
 
 template <typename TScope> void AllocatorEngine::PrintStats(const char* ScopeName) const noexcept
 {
     ContextStats::Snapshot Snap;
+
+    LOG_ALLOCATOR("DEBUG", "Engine: Collecting stats for " << ScopeName);
 
     if constexpr (ScopeTraits<TScope>::SupportsHandles) {
         using Bucket = typename PoolMap<TScope::g_BucketSize>::Type;

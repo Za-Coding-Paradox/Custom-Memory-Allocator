@@ -3,15 +3,6 @@
 namespace Allocator {
 
 template <typename TContext>
-thread_local SlabDescriptor* PoolModule<TContext>::g_ActiveSlab = nullptr;
-
-template <typename TContext>
-thread_local SlabDescriptor* PoolModule<TContext>::g_HeadSlab = nullptr;
-
-template <typename TContext>
-thread_local SlabDescriptor* PoolModule<TContext>::g_FirstNonFullSlab = nullptr;
-
-template <typename TContext>
 thread_local PoolModuleThreadGuard<TContext> PoolModule<TContext>::g_ThreadGuard;
 
 template <typename TContext>
@@ -26,54 +17,64 @@ template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree)
     if (MemoryToFree == nullptr) [[unlikely]]
         return;
 
+    auto& tls = GetTLS();
     const uintptr_t Target = reinterpret_cast<uintptr_t>(MemoryToFree);
-    if (g_ActiveSlab) {
-        const uintptr_t Start = g_ActiveSlab->GetSlabStart();
+    LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Freeing ptr " << MemoryToFree);
+
+    if (tls.ActiveSlab) {
+        const uintptr_t Start = tls.ActiveSlab->GetSlabStart();
         if (Target >= Start && Target < (Start + g_ConstSlabSize)) [[likely]] {
-            PoolStrategy::Free(*g_ActiveSlab, MemoryToFree);
+            PoolStrategy::Free(*tls.ActiveSlab, MemoryToFree);
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
             return;
         }
     }
 
-    SlabDescriptor* Current = g_HeadSlab;
+    SlabDescriptor* Current = tls.HeadSlab;
     while (Current) {
         const uintptr_t Start = Current->GetSlabStart();
         if (Target >= Start && Target < (Start + g_ConstSlabSize)) {
             PoolStrategy::Free(*Current, MemoryToFree);
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
-
-            if (!PoolStrategy::CanFit(*g_ActiveSlab))
-                g_ActiveSlab = Current;
+            if (tls.ActiveSlab && !PoolStrategy::CanFit(*tls.ActiveSlab)) {
+                tls.ActiveSlab = Current;
+            }
             return;
         }
         Current = Current->GetNextSlab();
     }
+    LOG_ALLOCATOR("ERROR", "Pool[" << g_ChunkSize << "B]: Free failed. Ptr not in pool.");
 }
 
 template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
 {
+    auto& tls = GetTLS();
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
-    if (!Registry) [[unlikely]]
+    if (!Registry) {
+        LOG_ALLOCATOR("CRITICAL", "Pool[" << g_ChunkSize << "B]: GrowSlabChain: NULL Registry!");
         return;
+    }
 
     SlabDescriptor* NewSlab = Registry->AllocateSlab();
-    if (!NewSlab) [[unlikely]]
+    if (!NewSlab) {
+        LOG_ALLOCATOR("ERROR", "Pool[" << g_ChunkSize << "B]: Registry OOM.");
         return;
+    }
 
     PoolStrategy::Format(*NewSlab, g_ChunkSize);
 
-    if (g_HeadSlab == nullptr) {
-        g_HeadSlab = NewSlab;
-        RegisterThreadContext();
+    if (tls.HeadSlab == nullptr) {
+        LOG_ALLOCATOR("INFO", "Pool[" << g_ChunkSize << "B]: Initial thread slab.");
+        tls.HeadSlab = NewSlab;
+        RegisterThreadContext(&tls.HeadSlab);
     }
     else {
-        NewSlab->SetNextSlab(g_HeadSlab);
-        g_HeadSlab = NewSlab;
+        NewSlab->SetNextSlab(tls.HeadSlab);
+        tls.HeadSlab = NewSlab;
     }
 
-    g_ActiveSlab = NewSlab;
-    g_FirstNonFullSlab = NewSlab;
+    tls.ActiveSlab = NewSlab;
+    tls.FirstNonFullSlab = NewSlab;
 }
 
 template <typename TContext> void PoolModule<TContext>::UpdatePeakUsage() noexcept
@@ -81,7 +82,6 @@ template <typename TContext> void PoolModule<TContext>::UpdatePeakUsage() noexce
     const size_t Alloc = g_Stats.BytesAllocated.load(std::memory_order_relaxed);
     const size_t Freed = g_Stats.BytesFreed.load(std::memory_order_relaxed);
     const size_t Current = (Alloc > Freed) ? (Alloc - Freed) : 0;
-
     size_t Peak = g_Stats.PeakUsage.load(std::memory_order_relaxed);
     while (Current > Peak) {
         if (g_Stats.PeakUsage.compare_exchange_weak(Peak, Current, std::memory_order_relaxed))
@@ -92,39 +92,49 @@ template <typename TContext> void PoolModule<TContext>::UpdatePeakUsage() noexce
 template <typename TContext>
 void PoolModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept
 {
-    if (RegistryInstance)
+    if (RegistryInstance) {
+        LOG_ALLOCATOR("INFO", "Pool[" << g_ChunkSize << "B]: Init at " << RegistryInstance);
         g_SlabRegistry.store(RegistryInstance, std::memory_order_release);
+    }
+    else {
+        LOG_ALLOCATOR("CRITICAL", "Pool[" << g_ChunkSize << "B]: Init NULL!");
+    }
 }
 
-template <typename TContext> void PoolModule<TContext>::RegisterThreadContext() noexcept
+template <typename TContext>
+void PoolModule<TContext>::RegisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    g_ThreadHeads.push_back(&g_HeadSlab);
+    g_ThreadHeads.push_back(ThreadHeadPtr);
 }
 
-template <typename TContext> void PoolModule<TContext>::UnregisterThreadContext() noexcept
+template <typename TContext>
+void PoolModule<TContext>::UnregisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    std::erase(g_ThreadHeads, &g_HeadSlab);
+    std::erase(g_ThreadHeads, ThreadHeadPtr);
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcept
 {
+    auto& tls = GetTLS();
+    LOG_ALLOCATOR("INFO", "Pool[" << g_ChunkSize << "B]: Thread Shutdown.");
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
-    UnregisterThreadContext();
+    UnregisterThreadContext(&tls.HeadSlab);
 
-    SlabDescriptor* Current = g_HeadSlab;
+    SlabDescriptor* Current = tls.HeadSlab;
     while (Current) {
         SlabDescriptor* Next = Current->GetNextSlab();
         if (Registry)
             Registry->FreeSlab(Current);
         Current = Next;
     }
-    g_HeadSlab = g_ActiveSlab = g_FirstNonFullSlab = nullptr;
+    tls.HeadSlab = tls.ActiveSlab = tls.FirstNonFullSlab = nullptr;
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcept
 {
+    LOG_ALLOCATOR("SYSTEM", "Pool[" << g_ChunkSize << "B]: Global Shutdown.");
     SlabRegistry* Registry = g_SlabRegistry.exchange(nullptr, std::memory_order_acq_rel);
     if (!Registry)
         return;
@@ -142,6 +152,11 @@ template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcep
         }
     }
     g_ThreadHeads.clear();
+}
+
+template <typename TContext> PoolModuleThreadGuard<TContext>::PoolModuleThreadGuard() noexcept
+{
+    LOG_ALLOCATOR("DEBUG", "[TLS] Pool Guard Constructed.");
 }
 
 template <typename TContext> PoolModuleThreadGuard<TContext>::~PoolModuleThreadGuard()
