@@ -92,6 +92,7 @@ template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree)
 
     while (CurrentSlab != nullptr) {
         const uintptr_t SlabStart = CurrentSlab->GetSlabStart();
+
         const uintptr_t SlabEnd = SlabStart + g_ConstSlabSize;
 
         if (TargetAddress >= SlabStart && TargetAddress < SlabEnd) [[likely]] {
@@ -204,6 +205,9 @@ template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcep
         }
     }
     g_ThreadHeads.clear();
+
+    g_ActiveSlab = nullptr;
+    g_FirstNonFullSlab = nullptr;
 }
 
 template <typename TContext> PoolModuleThreadGuard<TContext>::~PoolModuleThreadGuard()

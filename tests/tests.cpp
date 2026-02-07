@@ -1,9 +1,3 @@
-// ============================================================================
-// ALLOCATOR TORTURE TEST SUITE
-// Purpose: Put the dual-strategy allocator system through absolute hell
-// Target: 40+ tests covering stress, edge cases, concurrency, and corruption
-// ============================================================================
-
 #include <algorithm>
 #include <atomic>
 #include <barrier>
@@ -784,8 +778,7 @@ TEST_F(AllocatorEngineTest, BenchmarkComparison_LinearVsPool)
               << "Pool:   " << poolNsPerAlloc << " ns/alloc\n"
               << "Ratio:  " << (poolNsPerAlloc / linearNsPerAlloc) << "x\n";
 
-    // Relaxed expectation: Linear should just be roughly comparable or faster
-    EXPECT_LT(linearNsPerAlloc, poolNsPerAlloc * 1.25);
+    EXPECT_LT(linearNsPerAlloc, poolNsPerAlloc * 0.8);
 }
 
 TEST_F(AllocatorEngineTest, Fragmentation_PoolReusePattern)
@@ -843,7 +836,7 @@ TEST_F(AllocatorEngineTest, ExtremeSizeRequests_NearSlabLimit)
 struct ComplexObject
 {
     int* resource;
-    volatile uint64_t magic; // Volatile to prevent dead-store elimination in release builds
+    uint64_t magic;
 
     ComplexObject(int val) : magic(0xCAFEBABE)
     {

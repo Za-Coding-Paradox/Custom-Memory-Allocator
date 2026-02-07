@@ -280,6 +280,12 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownSystem
     }
 
     g_ThreadHeads.clear();
+
+    g_GlobalStats.BytesAllocated.store(0, std::memory_order_relaxed);
+    g_GlobalStats.BytesFreed.store(0, std::memory_order_relaxed);
+    g_GlobalStats.AllocationCount.store(0, std::memory_order_relaxed);
+    g_GlobalStats.PeakUsage.store(0, std::memory_order_relaxed);
+
     LOG_ALLOCATOR("INFO", "LinearModule: System Shutdown Complete.");
 }
 

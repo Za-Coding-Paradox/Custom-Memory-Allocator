@@ -107,12 +107,18 @@ bool HandleTable::GrowCapacity() noexcept
         NewPage[i].Generation = 1;
     }
 
-    NewPage[g_ElementsPerPage - 1].NextFree = m_FreeListHead.load(std::memory_order_relaxed);
-    NewPage[g_ElementsPerPage - 1].Generation = 1;
+    uint32_t OldHead = m_FreeListHead.load(std::memory_order_relaxed);
+    while (true) {
+        NewPage[g_ElementsPerPage - 1].NextFree = OldHead;
+        NewPage[g_ElementsPerPage - 1].Generation = 1;
+
+        if (m_FreeListHead.compare_exchange_weak(OldHead, BaseIndex, std::memory_order_release,
+                                                 std::memory_order_relaxed)) {
+            break;
+        }
+    }
 
     m_Pages[NextPageIndex].store(NewPage, std::memory_order_release);
-
-    m_FreeListHead.store(BaseIndex, std::memory_order_release);
 
     uint32_t NewTotalCapacity = BaseIndex + g_ElementsPerPage;
     m_Capacity.store(NewTotalCapacity, std::memory_order_release);
@@ -152,7 +158,7 @@ Handle HandleTable::Allocate(void* Pointer) noexcept
 
         uint32_t NextFree = Page[SlotIndex].NextFree;
 
-        if (m_FreeListHead.compare_exchange_weak(CurrentIndex, NextFree, std::memory_order_release,
+        if (m_FreeListHead.compare_exchange_weak(CurrentIndex, NextFree, std::memory_order_acq_rel,
                                                  std::memory_order_acquire)) {
 
             HandleMetadata& Meta = Page[SlotIndex];
