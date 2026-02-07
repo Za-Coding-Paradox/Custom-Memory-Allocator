@@ -1,9 +1,10 @@
+#include <iomanip>
 #include <modules/allocator_engine.h>
 
 namespace Allocator {
 
 namespace {
-constexpr size_t g_DefaultHandleCapacity = 1024;
+constexpr uint32_t g_DefaultHandleCapacity = 4096;
 constexpr size_t g_BytesPerKB = 1024;
 constexpr size_t g_BytesPerMB = 1024 * 1024;
 } // namespace
@@ -58,58 +59,45 @@ template <typename TScope> void AllocatorEngine::PrintStats(const char* ScopeNam
         Snap = LinearStrategyModule<TScope>::GetGlobalStats().GetSnapshot();
     }
 
-    std::cout << "\n[" << ScopeName << " Stats]\n";
-    std::cout << "  Allocated : " << FormatBytes(Snap.Allocated) << "\n";
-    std::cout << "  Current   : " << FormatBytes(Snap.Current) << "\n";
-    std::cout << "  Peak      : " << FormatBytes(Snap.Peak) << "\n";
-    std::cout << "  Count     : " << Snap.Count << "\n";
+    auto FormatBytes = [](size_t Bytes) -> std::string {
+        std::stringstream ss;
+        if (Bytes < g_BytesPerKB)
+            ss << Bytes << " B";
+        else if (Bytes < g_BytesPerMB)
+            ss << std::fixed << std::setprecision(2) << (double)Bytes / g_BytesPerKB << " KB";
+        else
+            ss << std::fixed << std::setprecision(2) << (double)Bytes / g_BytesPerMB << " MB";
+        return ss.str();
+    };
+
+    std::cout << "\n[" << ScopeName << "]\n"
+              << "  Allocated : " << FormatBytes(Snap.Allocated) << "\n"
+              << "  Current   : " << FormatBytes(Snap.Current) << "\n"
+              << "  Peak      : " << FormatBytes(Snap.Peak) << "\n"
+              << "  Count     : " << Snap.Count << "\n";
 }
 
 void AllocatorEngine::GenerateFullReport() const noexcept
 {
-    std::cout << "================================================================\n";
-    std::cout << "                   MEMORY ALLOCATION REPORT                     \n";
-    std::cout << "================================================================\n";
+    std::cout << "================================================================\n"
+              << "                    ALLOCATOR PERFORMANCE REPORT                \n"
+              << "================================================================\n";
 
-    PrintStats<FrameLoad>("Linear: FrameLoad");
-    PrintStats<LevelLoad>("Linear: LevelLoad");
-    PrintStats<GlobalLoad>("Linear: GlobalLoad");
+    PrintStats<FrameLoad>("Linear: Frame");
+    PrintStats<LevelLoad>("Linear: Level");
+    PrintStats<GlobalLoad>("Linear: Global");
 
-    std::cout << "\n--- Shared Pool Buckets ---";
+    std::cout << "\n--- Fixed Size Pool Buckets ---";
     PrintStats<BucketScope<16>>("Pool: 16B");
     PrintStats<BucketScope<32>>("Pool: 32B");
     PrintStats<BucketScope<64>>("Pool: 64B");
     PrintStats<BucketScope<128>>("Pool: 128B");
     PrintStats<BucketScope<256>>("Pool: 256B");
 
-    std::cout << "\n[System Overview]\n";
-    std::cout << "  Handle Capacity: " << m_HandleTable.GetCapacity() << "\n";
-    std::cout << "  Active Handles : " << m_HandleTable.GetActiveCount() << "\n";
-    std::cout << "================================================================\n";
-}
-
-void AllocatorEngine::ReportError(const char* Msg, std::source_location Loc) const noexcept
-{
-    std::cerr << "[Allocator ERROR] " << Msg << "\n"
-              << "  File: " << Loc.file_name() << ":" << Loc.line() << "\n"
-              << "  Func: " << Loc.function_name() << "\n";
-}
-
-std::string AllocatorEngine::FormatBytes(size_t Bytes) noexcept
-{
-    std::stringstream StringStream;
-    if (Bytes < g_BytesPerKB) {
-        StringStream << Bytes << " B";
-    }
-    else if (Bytes < g_BytesPerMB) {
-        StringStream << std::fixed << std::setprecision(2)
-                     << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerKB)) << " KB";
-    }
-    else {
-        StringStream << std::fixed << std::setprecision(2)
-                     << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerMB)) << " MB";
-    }
-    return StringStream.str();
+    std::cout << "\n[Registry State]\n"
+              << "  Handles Active: " << m_HandleTable.GetActiveCount() << " / "
+              << m_HandleTable.GetCapacity() << "\n"
+              << "================================================================\n";
 }
 
 template void AllocatorEngine::PrintStats<FrameLoad>(const char*) const noexcept;

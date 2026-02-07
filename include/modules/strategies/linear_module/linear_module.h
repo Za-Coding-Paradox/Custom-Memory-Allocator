@@ -24,7 +24,8 @@ private:
     static std::mutex g_ContextMutex;
     static std::vector<SlabDescriptor**> g_ThreadHeads;
 
-    static void* OverFlowAllocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
+    [[nodiscard]] static void* OverFlowAllocate(size_t AllocationSize,
+                                                size_t AllocationAlignment) noexcept;
     static void GrowSlabChain() noexcept;
 
     static size_t GetThreadTotalUsed() noexcept;
@@ -42,12 +43,50 @@ public:
     static void ShutdownModule() noexcept;
     static void ShutdownSystem() noexcept;
 
-    [[nodiscard]] static void* Allocate(size_t AllocationSize, size_t AllocationAlignment) noexcept;
+    [[nodiscard]] __attribute__((always_inline)) static void*
+    Allocate(size_t AllocationSize, size_t AllocationAlignment) noexcept
+    {
+        (void)g_ThreadGuard;
+
+        if (AllocationSize > g_ConstSlabSize) [[unlikely]]
+            return nullptr;
+
+        if (g_ActiveSlab == nullptr) [[unlikely]] {
+            GrowSlabChain();
+            if (g_ActiveSlab == nullptr)
+                return nullptr;
+        }
+
+        void* Result = nullptr;
+
+        if (LinearStrategy::CanFit(*g_ActiveSlab, AllocationSize, AllocationAlignment)) [[likely]] {
+            const uintptr_t HeadBefore = g_ActiveSlab->GetFreeListHead();
+            Result = LinearStrategy::Allocate(*g_ActiveSlab, AllocationSize, AllocationAlignment);
+            const uintptr_t HeadAfter = g_ActiveSlab->GetFreeListHead();
+
+            g_ThreadAllocated += static_cast<size_t>(HeadAfter - HeadBefore);
+        }
+        else {
+            Result = OverFlowAllocate(AllocationSize, AllocationAlignment);
+        }
+
+        if (Result != nullptr) [[likely]] {
+            g_ThreadCount++;
+
+            ALLOCATOR_DIAGNOSTIC({
+                size_t CurrentUsed = GetThreadTotalUsed();
+                if (CurrentUsed > g_ThreadPeak) {
+                    g_ThreadPeak = CurrentUsed;
+                }
+            });
+        }
+        return Result;
+    }
 
     static void FlushThreadStats() noexcept;
     static ContextStats& GetGlobalStats() noexcept { return g_GlobalStats; }
 
-    static void Free(SlabDescriptor& SlabToFree, void* MemoryAddressToFree) noexcept = delete;
+    static void Free(SlabDescriptor&, void*) noexcept = delete;
 
     static void Reset() noexcept
         requires(!TContext::IsRewindable);
@@ -74,8 +113,7 @@ public:
 
 template <typename TContext> class LinearScopedMarker
 {
-    static_assert(TContext::IsRewindable,
-                  "[DEBUG] LinearScopedMarker: Context does not support rewinding.");
+    static_assert(TContext::IsRewindable, "LinearScopedMarker requires a Rewindable context.");
 
     SlabDescriptor* m_MarkedSlab;
     uintptr_t m_MarkedOffset;
@@ -84,7 +122,8 @@ template <typename TContext> class LinearScopedMarker
 public:
     LinearScopedMarker() noexcept;
     ~LinearScopedMarker() noexcept;
-    void Commit() noexcept;
+
+    __attribute__((always_inline)) void Commit() noexcept { m_HasState = false; }
 };
 
 } // namespace Allocator

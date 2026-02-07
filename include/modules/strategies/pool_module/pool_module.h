@@ -21,9 +21,42 @@ public:
     static void ShutdownModule() noexcept;
     static void ShutdownSystem() noexcept;
 
-    [[nodiscard]] static void* Allocate() noexcept;
-    static void Free(void* MemoryToFree) noexcept;
+    [[nodiscard]] __attribute__((always_inline)) static void* Allocate() noexcept
+    {
+        void* Result = nullptr;
 
+        if (g_ActiveSlab && PoolStrategy::CanFit(*g_ActiveSlab)) [[likely]] {
+            Result = PoolStrategy::Allocate(*g_ActiveSlab);
+        }
+        else {
+            SlabDescriptor* Current = (g_FirstNonFullSlab) ? g_FirstNonFullSlab : g_HeadSlab;
+            while (Current) {
+                if (PoolStrategy::CanFit(*Current)) {
+                    g_ActiveSlab = Current;
+                    g_FirstNonFullSlab = Current;
+                    Result = PoolStrategy::Allocate(*g_ActiveSlab);
+                    break;
+                }
+                Current = Current->GetNextSlab();
+            }
+
+            if (!Result) {
+                GrowSlabChain();
+                if (g_ActiveSlab)
+                    Result = PoolStrategy::Allocate(*g_ActiveSlab);
+            }
+        }
+
+        if (Result != nullptr) [[likely]] {
+            g_Stats.AllocationCount.fetch_add(1, std::memory_order_relaxed);
+            g_Stats.BytesAllocated.fetch_add(g_ChunkSize, std::memory_order_relaxed);
+
+            ALLOCATOR_DIAGNOSTIC({ UpdatePeakUsage(); });
+        }
+        return Result;
+    }
+
+    static void Free(void* MemoryToFree) noexcept;
     static ContextStats::Snapshot GetStats() noexcept { return g_Stats.GetSnapshot(); }
 
 private:

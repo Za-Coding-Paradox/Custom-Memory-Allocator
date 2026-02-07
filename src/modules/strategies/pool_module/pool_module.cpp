@@ -18,108 +18,48 @@ template <typename TContext>
 std::atomic<SlabRegistry*> PoolModule<TContext>::g_SlabRegistry{nullptr};
 
 template <typename TContext> std::mutex PoolModule<TContext>::g_ContextMutex;
-
 template <typename TContext> std::vector<SlabDescriptor**> PoolModule<TContext>::g_ThreadHeads;
-
 template <typename TContext> ContextStats PoolModule<TContext>::g_Stats;
-
-template <typename TContext>
-void PoolModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept
-{
-    if (RegistryInstance != nullptr) {
-        g_SlabRegistry.store(RegistryInstance, std::memory_order_release);
-
-        g_Stats.BytesAllocated.store(0, std::memory_order_relaxed);
-        g_Stats.BytesFreed.store(0, std::memory_order_relaxed);
-        g_Stats.AllocationCount.store(0, std::memory_order_relaxed);
-        g_Stats.PeakUsage.store(0, std::memory_order_relaxed);
-    }
-}
-
-template <typename TContext> [[nodiscard]] void* PoolModule<TContext>::Allocate() noexcept
-{
-    (void)g_ThreadGuard;
-
-    void* AllocatedBlock = nullptr;
-
-    if (g_ActiveSlab != nullptr) [[likely]] {
-        AllocatedBlock = PoolStrategy::Allocate(*g_ActiveSlab);
-    }
-
-    if (AllocatedBlock == nullptr) {
-        SlabDescriptor* CurrentSlab =
-            (g_FirstNonFullSlab != nullptr) ? g_FirstNonFullSlab : g_HeadSlab;
-
-        while (CurrentSlab != nullptr) {
-            if (PoolStrategy::CanFit(*CurrentSlab)) {
-                g_ActiveSlab = CurrentSlab;
-                g_FirstNonFullSlab = CurrentSlab;
-                AllocatedBlock = PoolStrategy::Allocate(*g_ActiveSlab);
-                break;
-            }
-            if (g_FirstNonFullSlab == CurrentSlab) {
-                g_FirstNonFullSlab = CurrentSlab->GetNextSlab();
-            }
-
-            CurrentSlab = CurrentSlab->GetNextSlab();
-        }
-    }
-
-    if (AllocatedBlock == nullptr) {
-        GrowSlabChain();
-        if (g_ActiveSlab != nullptr) {
-            AllocatedBlock = PoolStrategy::Allocate(*g_ActiveSlab);
-            g_FirstNonFullSlab = g_ActiveSlab;
-        }
-    }
-
-    if (AllocatedBlock != nullptr) [[likely]] {
-        g_Stats.BytesAllocated.fetch_add(g_ChunkSize, std::memory_order_relaxed);
-        g_Stats.AllocationCount.fetch_add(1, std::memory_order_relaxed);
-        UpdatePeakUsage();
-    }
-
-    return AllocatedBlock;
-}
 
 template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree) noexcept
 {
     if (MemoryToFree == nullptr) [[unlikely]]
         return;
 
-    const auto TargetAddress = std::bit_cast<uintptr_t>(MemoryToFree);
-    SlabDescriptor* CurrentSlab = g_HeadSlab;
-
-    while (CurrentSlab != nullptr) {
-        const uintptr_t SlabStart = CurrentSlab->GetSlabStart();
-
-        const uintptr_t SlabEnd = SlabStart + g_ConstSlabSize;
-
-        if (TargetAddress >= SlabStart && TargetAddress < SlabEnd) [[likely]] {
-            PoolStrategy::Free(*CurrentSlab, MemoryToFree);
-
+    const uintptr_t Target = reinterpret_cast<uintptr_t>(MemoryToFree);
+    if (g_ActiveSlab) {
+        const uintptr_t Start = g_ActiveSlab->GetSlabStart();
+        if (Target >= Start && Target < (Start + g_ConstSlabSize)) [[likely]] {
+            PoolStrategy::Free(*g_ActiveSlab, MemoryToFree);
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
-
-            if (g_ActiveSlab == nullptr || !PoolStrategy::CanFit(*g_ActiveSlab)) {
-                g_ActiveSlab = CurrentSlab;
-            }
             return;
         }
-        CurrentSlab = CurrentSlab->GetNextSlab();
+    }
+
+    SlabDescriptor* Current = g_HeadSlab;
+    while (Current) {
+        const uintptr_t Start = Current->GetSlabStart();
+        if (Target >= Start && Target < (Start + g_ConstSlabSize)) {
+            PoolStrategy::Free(*Current, MemoryToFree);
+            g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
+
+            if (!PoolStrategy::CanFit(*g_ActiveSlab))
+                g_ActiveSlab = Current;
+            return;
+        }
+        Current = Current->GetNextSlab();
     }
 }
 
 template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
 {
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
-    if (Registry == nullptr) [[unlikely]] {
+    if (!Registry) [[unlikely]]
         return;
-    }
 
     SlabDescriptor* NewSlab = Registry->AllocateSlab();
-    if (NewSlab == nullptr) [[unlikely]] {
+    if (!NewSlab) [[unlikely]]
         return;
-    }
 
     PoolStrategy::Format(*NewSlab, g_ChunkSize);
 
@@ -133,22 +73,27 @@ template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
     }
 
     g_ActiveSlab = NewSlab;
+    g_FirstNonFullSlab = NewSlab;
 }
 
 template <typename TContext> void PoolModule<TContext>::UpdatePeakUsage() noexcept
 {
-    const size_t Allocated = g_Stats.BytesAllocated.load(std::memory_order_relaxed);
+    const size_t Alloc = g_Stats.BytesAllocated.load(std::memory_order_relaxed);
     const size_t Freed = g_Stats.BytesFreed.load(std::memory_order_relaxed);
-    const size_t CurrentUsage = (Allocated > Freed) ? (Allocated - Freed) : static_cast<size_t>(0);
+    const size_t Current = (Alloc > Freed) ? (Alloc - Freed) : 0;
 
-    size_t CurrentPeak = g_Stats.PeakUsage.load(std::memory_order_relaxed);
-
-    while (CurrentUsage > CurrentPeak) {
-        if (g_Stats.PeakUsage.compare_exchange_weak(CurrentPeak, CurrentUsage,
-                                                    std::memory_order_relaxed)) {
+    size_t Peak = g_Stats.PeakUsage.load(std::memory_order_relaxed);
+    while (Current > Peak) {
+        if (g_Stats.PeakUsage.compare_exchange_weak(Peak, Current, std::memory_order_relaxed))
             break;
-        }
     }
+}
+
+template <typename TContext>
+void PoolModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noexcept
+{
+    if (RegistryInstance)
+        g_SlabRegistry.store(RegistryInstance, std::memory_order_release);
 }
 
 template <typename TContext> void PoolModule<TContext>::RegisterThreadContext() noexcept
@@ -160,10 +105,7 @@ template <typename TContext> void PoolModule<TContext>::RegisterThreadContext() 
 template <typename TContext> void PoolModule<TContext>::UnregisterThreadContext() noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    auto Iterator = std::find(g_ThreadHeads.begin(), g_ThreadHeads.end(), &g_HeadSlab);
-    if (Iterator != g_ThreadHeads.end()) {
-        g_ThreadHeads.erase(Iterator);
-    }
+    std::erase(g_ThreadHeads, &g_HeadSlab);
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcept
@@ -171,53 +113,41 @@ template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcep
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
     UnregisterThreadContext();
 
-    SlabDescriptor* CurrentSlab = g_HeadSlab;
-    while (CurrentSlab != nullptr) {
-        SlabDescriptor* NextSlab = CurrentSlab->GetNextSlab();
-        if (Registry != nullptr) {
-            Registry->FreeSlab(CurrentSlab);
-        }
-        CurrentSlab = NextSlab;
+    SlabDescriptor* Current = g_HeadSlab;
+    while (Current) {
+        SlabDescriptor* Next = Current->GetNextSlab();
+        if (Registry)
+            Registry->FreeSlab(Current);
+        Current = Next;
     }
-
-    g_HeadSlab = nullptr;
-    g_ActiveSlab = nullptr;
-    g_FirstNonFullSlab = nullptr;
+    g_HeadSlab = g_ActiveSlab = g_FirstNonFullSlab = nullptr;
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcept
 {
     SlabRegistry* Registry = g_SlabRegistry.exchange(nullptr, std::memory_order_acq_rel);
-    if (Registry == nullptr) {
+    if (!Registry)
         return;
-    }
 
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    for (SlabDescriptor** ThreadHeadPtr : g_ThreadHeads) {
-        if (ThreadHeadPtr != nullptr && *ThreadHeadPtr != nullptr) {
-            SlabDescriptor* CurrentSlab = *ThreadHeadPtr;
-            while (CurrentSlab != nullptr) {
-                SlabDescriptor* NextSlab = CurrentSlab->GetNextSlab();
-                Registry->FreeSlab(CurrentSlab);
-                CurrentSlab = NextSlab;
+    for (SlabDescriptor** HeadPtr : g_ThreadHeads) {
+        if (HeadPtr && *HeadPtr) {
+            SlabDescriptor* Current = *HeadPtr;
+            while (Current) {
+                SlabDescriptor* Next = Current->GetNextSlab();
+                Registry->FreeSlab(Current);
+                Current = Next;
             }
-            *ThreadHeadPtr = nullptr;
+            *HeadPtr = nullptr;
         }
     }
     g_ThreadHeads.clear();
-
-    g_ActiveSlab = nullptr;
-    g_FirstNonFullSlab = nullptr;
 }
 
 template <typename TContext> PoolModuleThreadGuard<TContext>::~PoolModuleThreadGuard()
 {
     PoolModule<TContext>::ShutdownModule();
 }
-
-} // namespace Allocator
-
-namespace Allocator {
 
 template class PoolModule<BucketScope<16>>;
 template class PoolModule<BucketScope<32>>;
