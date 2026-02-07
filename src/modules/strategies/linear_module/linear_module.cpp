@@ -110,8 +110,10 @@ void LinearStrategyModule<TContext>::Reset() noexcept
     if (tls.HeadSlab != nullptr) {
         SlabDescriptor* Current = tls.HeadSlab;
         while (Current) {
+            SlabDescriptor* NextSlab = Current->GetNextSlab();
             LinearStrategy::Reset(*Current);
-            Current = Current->GetNextSlab();
+            Current->SetNextSlab(NextSlab);
+            Current = NextSlab;
         }
         tls.ActiveSlab = tls.HeadSlab;
         FlushThreadStats();
@@ -138,27 +140,96 @@ std::pair<SlabDescriptor*, uintptr_t> LinearStrategyModule<TContext>::GetCurrent
     requires(TContext::IsRewindable)
 {
     auto& tls = GetTLS();
-    return tls.ActiveSlab ? std::make_pair(tls.ActiveSlab, tls.ActiveSlab->GetFreeListHead())
-                          : std::make_pair(nullptr, 0);
+
+    if (!tls.ActiveSlab) [[unlikely]] {
+        LOG_ALLOCATOR(
+            "DEBUG",
+            "[L-STATE] GetCurrentState called on uninitialized thread. Returning null state.");
+        return {nullptr, 0};
+    }
+
+    uintptr_t currentOffset = tls.ActiveSlab->GetFreeListHead();
+    LOG_ALLOCATOR("DEBUG", "[L-STATE] Captured State: Slab [" << tls.ActiveSlab << "] Offset ["
+                                                              << currentOffset << "]");
+
+    return {tls.ActiveSlab, currentOffset};
 }
 
 template <typename TContext>
-LinearScopedMarker<TContext>::LinearScopedMarker() noexcept : m_HasState(true)
+void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
+                                                 uintptr_t SavedOffset) noexcept
+    requires(TContext::IsRewindable)
 {
-    auto State = LinearStrategyModule<TContext>::GetCurrentState();
-    m_MarkedSlab = State.first;
-    m_MarkedOffset = State.second;
-}
-template <typename TContext> LinearScopedMarker<TContext>::~LinearScopedMarker() noexcept
-{
-    if (m_HasState && m_MarkedSlab)
-        LinearStrategyModule<TContext>::RewindState(m_MarkedSlab, m_MarkedOffset);
+    if (!SavedSlab) [[unlikely]] {
+        LOG_ALLOCATOR("WARN", "[L-REWIND] Received null SavedSlab. Performing full thread reset.");
+
+        auto& tls = GetTLS();
+        if (tls.HeadSlab != nullptr) {
+            SlabDescriptor* Current = tls.HeadSlab;
+            while (Current) {
+                SlabDescriptor* NextSlab = Current->GetNextSlab();
+                LinearStrategy::Reset(*Current);
+                Current->SetNextSlab(NextSlab);
+                Current = NextSlab;
+            }
+            tls.ActiveSlab = tls.HeadSlab;
+            FlushThreadStats();
+        }
+        return;
+    }
+
+    auto& tls = GetTLS();
+
+    ALLOCATOR_DIAGNOSTIC({
+        size_t usedBefore = GetThreadTotalUsed();
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Starting Rewind. Thread current usage: " << usedBefore
+                                                                                    << " bytes.");
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Target: Slab [" << SavedSlab << "] Target Offset ["
+                                                           << SavedOffset << "]");
+    });
+
+    SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
+    SlabDescriptor* Victim = SavedSlab->GetNextSlab();
+
+    if (Victim != nullptr) {
+        LOG_ALLOCATOR("DEBUG",
+                      "[L-REWIND] Overflow detected. Detaching and returning trailing slab chain.");
+
+        SavedSlab->SetNextSlab(nullptr);
+        tls.ActiveSlab = SavedSlab;
+
+        while (Victim != nullptr) {
+            SlabDescriptor* NextVictim = Victim->GetNextSlab();
+            if (Registry) [[likely]] {
+                LOG_ALLOCATOR("DEBUG",
+                              "[L-REWIND] Returning orphaned slab " << Victim << " to Registry.");
+                Registry->FreeSlab(Victim);
+            }
+            Victim = NextVictim;
+        }
+    }
+    else {
+        tls.ActiveSlab = SavedSlab;
+    }
+
+    LinearStrategy::RewindToMarker(*tls.ActiveSlab, SavedOffset);
+
+    ALLOCATOR_DIAGNOSTIC({
+        size_t usedAfter = GetThreadTotalUsed();
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Rewind successful. Thread usage restored to "
+                                   << usedAfter << " bytes.");
+    });
 }
 
 template class LinearStrategyModule<FrameLoad>;
 template class LinearStrategyModule<LevelLoad>;
 template class LinearStrategyModule<GlobalLoad>;
+
 template class LinearModuleThreadGuard<FrameLoad>;
 template class LinearModuleThreadGuard<LevelLoad>;
 template class LinearModuleThreadGuard<GlobalLoad>;
+
+template class LinearScopedMarker<LevelLoad>;
+template class LinearScopedMarker<GlobalLoad>;
+
 } // namespace Allocator

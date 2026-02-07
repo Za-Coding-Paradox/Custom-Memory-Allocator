@@ -162,4 +162,19 @@ public:
     void Commit() noexcept { m_HasState = false; }
 };
 
+template <typename TContext>
+inline LinearScopedMarker<TContext>::LinearScopedMarker() noexcept : m_HasState(true)
+{
+    auto State = LinearStrategyModule<TContext>::GetCurrentState();
+    m_MarkedSlab = State.first;
+    m_MarkedOffset = State.second;
+}
+
+template <typename TContext> inline LinearScopedMarker<TContext>::~LinearScopedMarker() noexcept
+{
+    if (m_HasState && m_MarkedSlab) {
+        LinearStrategyModule<TContext>::RewindState(m_MarkedSlab, m_MarkedOffset);
+    }
+}
+
 } // namespace Allocator
