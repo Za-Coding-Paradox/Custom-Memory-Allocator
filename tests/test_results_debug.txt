@@ -1,0 +1,75 @@
+
+╔══════════════════════════════════════════════════════════════╗
+║       ALLOCATOR TORTURE TEST SUITE - REFACTORED (2026)       ║
+║       Objective: Stress Unified TLS & Atomic Handshake       ║
+╚══════════════════════════════════════════════════════════════╝
+
+[==========] Running 16 tests from 3 test suites.
+[----------] Global test environment set-up.
+[----------] 13 tests from AllocatorEngineTest
+[ RUN      ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads
+Running::HighFrequencyThrashing_1MillionAllocs_16Threads
+>> Total Allocations: 16000000
+>> Nanoseconds per Allocation: 18.7671 ns
+[       OK ] AllocatorEngineTest.HighFrequencyThrashing_1MillionAllocs_16Threads (328 ms)
+[ RUN      ] AllocatorEngineTest.ContentionStorm_SimultaneousSlabRequests
+Running Test 2 
+I reached outside
+[       OK ] AllocatorEngineTest.ContentionStorm_SimultaneousSlabRequests (23 ms)
+[ RUN      ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover
+Running Test 3
+I reached outside again
+[       OK ] AllocatorEngineTest.SlabExhaustion_FillArena_VerifyOOM_ThenRecover (43 ms)
+[ RUN      ] AllocatorEngineTest.ZeroByteAllocation_MustReturnNull
+Running Test 4 
+[       OK ] AllocatorEngineTest.ZeroByteAllocation_MustReturnNull (21 ms)
+[ RUN      ] AllocatorEngineTest.AlignmentNightmare_VariousPowersOfTwo
+Running Test 5 
+[       OK ] AllocatorEngineTest.AlignmentNightmare_VariousPowersOfTwo (21 ms)
+[ RUN      ] AllocatorEngineTest.HandleStaleness_AllocateFreeResolve
+Running Test 6 
+[       OK ] AllocatorEngineTest.HandleStaleness_AllocateFreeResolve (20 ms)
+[ RUN      ] AllocatorEngineTest.PeakUsageValidation_Sawtooth
+Running Test 7 (Fixed for TLS Architecture)
+>> Stats Debug -> Alloc: 640000 | Freed: 512000 | Peak: 128000
+[       OK ] AllocatorEngineTest.PeakUsageValidation_Sawtooth (21 ms)
+[ RUN      ] AllocatorEngineTest.LinearScopedMarker_RecursiveRewind
+Running Test 10
+[       OK ] AllocatorEngineTest.LinearScopedMarker_RecursiveRewind (20 ms)
+[ RUN      ] AllocatorEngineTest.RecursiveOverflow_ChainIntegrity
+Running Test 12
+[       OK ] AllocatorEngineTest.RecursiveOverflow_ChainIntegrity (21 ms)
+[ RUN      ] AllocatorEngineTest.MixedBuckets_Interleaved
+Running Test 13
+[       OK ] AllocatorEngineTest.MixedBuckets_Interleaved (21 ms)
+[ RUN      ] AllocatorEngineTest.ComplexTypes_PlacementNew_Destructor
+Running Test 14 (Side-Effect Verification)
+[       OK ] AllocatorEngineTest.ComplexTypes_PlacementNew_Destructor (21 ms)
+[ RUN      ] AllocatorEngineTest.Performance_LinearSubMicrosecond
+Running Test 16 
+>> Linear Speed: 82.3568 ns/alloc
+[       OK ] AllocatorEngineTest.Performance_LinearSubMicrosecond (29 ms)
+[ RUN      ] AllocatorEngineTest.Performance_HandleResolution_Blazing
+Running Test 17 
+>> Resolution Speed: 2.10792 ns/resolve
+[       OK ] AllocatorEngineTest.Performance_HandleResolution_Blazing (23 ms)
+[----------] 13 tests from AllocatorEngineTest (616 ms total)
+
+[----------] 2 tests from HandleSystemTest
+[ RUN      ] HandleSystemTest.ConcurrentHandleAllocation_MassiveContention
+Running Test 8 
+[       OK ] HandleSystemTest.ConcurrentHandleAllocation_MassiveContention (8 ms)
+[ RUN      ] HandleSystemTest.DoubleFree_Safety
+Running Test 9
+[       OK ] HandleSystemTest.DoubleFree_Safety (0 ms)
+[----------] 2 tests from HandleSystemTest (8 ms total)
+
+[----------] 1 test from UtilityTest
+[ RUN      ] UtilityTest.PowerOfTwo_Alignment
+Running Test 15 
+[       OK ] UtilityTest.PowerOfTwo_Alignment (0 ms)
+[----------] 1 test from UtilityTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 16 tests from 3 test suites ran. (625 ms total)
+[  PASSED  ] 16 tests.

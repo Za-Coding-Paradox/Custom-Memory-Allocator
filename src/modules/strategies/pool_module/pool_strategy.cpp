@@ -2,8 +2,7 @@
 
 namespace Allocator {
 
-static const size_t g_AvailableBlocksCheckIncrement = 2;
-static const size_t g_EndOfFreeListMarkerForNoFreeSpaceSlab = 0;
+static constexpr uintptr_t g_EndOfFreeListMarker = 0;
 
 void PoolStrategy::Format(SlabDescriptor& SlabToInitialize, size_t ChunkSize) noexcept
 {
@@ -14,64 +13,37 @@ void PoolStrategy::Format(SlabDescriptor& SlabToInitialize, size_t ChunkSize) no
     SlabToInitialize.UpdateFreeListHead(SlabStart);
 
     uintptr_t CurrentBlock = SlabStart;
+    const size_t TotalSlots = SlabSize / ChunkSize;
 
-    while (static_cast<uintptr_t>(
-               CurrentBlock +
-               (static_cast<uintptr_t>(g_AvailableBlocksCheckIncrement) * ChunkSize)) <= SlabEnd) {
-        auto* NextLink = std::bit_cast<uintptr_t*>(CurrentBlock);
-        *NextLink = CurrentBlock + static_cast<uintptr_t>(ChunkSize);
-        CurrentBlock += static_cast<uintptr_t>(ChunkSize);
+    for (size_t i = 0; i < TotalSlots - 1; ++i) {
+        uintptr_t NextBlock = CurrentBlock + static_cast<uintptr_t>(ChunkSize);
+        *reinterpret_cast<uintptr_t*>(CurrentBlock) = NextBlock;
+        CurrentBlock = NextBlock;
     }
 
-    auto* LastLink = std::bit_cast<uintptr_t*>(CurrentBlock);
-    *LastLink = static_cast<uintptr_t>(g_EndOfFreeListMarkerForNoFreeSpaceSlab);
+    *reinterpret_cast<uintptr_t*>(CurrentBlock) = g_EndOfFreeListMarker;
 
-    const size_t TotalSlots = SlabSize / ChunkSize;
     SlabToInitialize.SetTotalSlots(TotalSlots);
     SlabToInitialize.SetActiveSlots(0);
 }
 
-[[nodiscard]] void* PoolStrategy::Allocate(SlabDescriptor& SlabToAllocate) noexcept
-{
-    const uintptr_t AvailableAddress = SlabToAllocate.GetFreeListHead();
-
-    if (AvailableAddress == static_cast<uintptr_t>(g_EndOfFreeListMarkerForNoFreeSpaceSlab))
-        [[unlikely]] {
-        return nullptr;
-    }
-
-    const uintptr_t NextFreeAddress = *std::bit_cast<uintptr_t*>(AvailableAddress);
-
-    SlabToAllocate.UpdateFreeListHead(NextFreeAddress);
-    SlabToAllocate.IncrementActiveSlots();
-
-    return std::bit_cast<void*>(AvailableAddress);
-}
-
 void PoolStrategy::Free(SlabDescriptor& SlabToFree, void* MemoryToFree) noexcept
 {
-    if (MemoryToFree == nullptr) [[unlikely]] {
+    if (MemoryToFree == nullptr) [[unlikely]]
         return;
-    }
 
-    const auto BlockToReturn = std::bit_cast<uintptr_t>(MemoryToFree);
+    const uintptr_t BlockToReturn = reinterpret_cast<uintptr_t>(MemoryToFree);
     const uintptr_t OldHead = SlabToFree.GetFreeListHead();
 
-    auto* NextLink = std::bit_cast<uintptr_t*>(BlockToReturn);
-    *NextLink = OldHead;
-
+    *reinterpret_cast<uintptr_t*>(BlockToReturn) = OldHead;
     SlabToFree.UpdateFreeListHead(BlockToReturn);
 
-    const size_t CurrentActive = SlabToFree.GetActiveSlots();
-    if (CurrentActive > 0) [[likely]] {
-        SlabToFree.SetActiveSlots(CurrentActive - static_cast<size_t>(1));
-    }
-}
-
-[[nodiscard]] bool PoolStrategy::CanFit(const SlabDescriptor& SlabToCheck) noexcept
-{
-    return SlabToCheck.GetFreeListHead() !=
-           static_cast<uintptr_t>(g_EndOfFreeListMarkerForNoFreeSpaceSlab);
+    ALLOCATOR_DIAGNOSTIC({
+        const size_t CurrentActive = SlabToFree.GetActiveSlots();
+        if (CurrentActive > 0) [[likely]] {
+            SlabToFree.SetActiveSlots(CurrentActive - 1);
+        }
+    });
 }
 
 } // namespace Allocator

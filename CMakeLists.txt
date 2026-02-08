@@ -25,7 +25,7 @@ target_include_directories(allocator PUBLIC src/include)
 # 3. YOUR EXECUTABLE
 # ==============================================================================
 add_executable(allocator_test 
-    main/main.cpp 
+   tests/tests.cpp 
 )
 
 # LINKING:

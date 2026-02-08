@@ -1,37 +1,59 @@
+#include <iomanip>
 #include <modules/allocator_engine.h>
 
 namespace Allocator {
 
 namespace {
-constexpr size_t g_DefaultHandleCapacity = 1024;
+constexpr uint32_t g_DefaultHandleCapacity = 4096;
 constexpr size_t g_BytesPerKB = 1024;
 constexpr size_t g_BytesPerMB = 1024 * 1024;
 } // namespace
 
 AllocatorEngine::AllocatorEngine(size_t SlabSize, size_t ArenaSize)
     : m_Registry(SlabSize, ArenaSize), m_HandleTable(g_DefaultHandleCapacity)
-{}
+{
+    LOG_ALLOCATOR("INFO", "Engine: Constructor called. Registry Address: " << &m_Registry);
+}
 
 AllocatorEngine::~AllocatorEngine()
 {
+    LOG_ALLOCATOR("INFO", "Engine: Destructor called.");
     Shutdown();
 }
 
 void AllocatorEngine::Initialize()
 {
+    LOG_ALLOCATOR("SYSTEM", "Engine: Initializing Static Strategy Modules...");
+
+    // Check registry sanity before passing it
+    if (m_Registry.GetArenaSlabsStart() == nullptr) {
+        LOG_ALLOCATOR(
+            "CRITICAL",
+            "Engine: Registry has NULL Slabs Start! Initialization will likely cause Segfault.");
+    }
+
+    // Handover to Linear Modules
+    LOG_ALLOCATOR("DEBUG",
+                  "Engine: Initializing Linear Strategy Modules with Registry: " << &m_Registry);
     LinearStrategyModule<FrameLoad>::InitializeModule(&m_Registry);
     LinearStrategyModule<LevelLoad>::InitializeModule(&m_Registry);
     LinearStrategyModule<GlobalLoad>::InitializeModule(&m_Registry);
 
+    // Handover to Pool Modules
+    LOG_ALLOCATOR("DEBUG", "Engine: Initializing Pool Modules...");
     PoolModule<BucketScope<16>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<32>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<64>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<128>>::InitializeModule(&m_Registry);
     PoolModule<BucketScope<256>>::InitializeModule(&m_Registry);
+
+    LOG_ALLOCATOR("SYSTEM", "Engine: Static Handover Complete.");
 }
 
 void AllocatorEngine::Shutdown()
 {
+    LOG_ALLOCATOR("SYSTEM", "Engine: Starting Shutdown...");
+
     LinearStrategyModule<FrameLoad>::ShutdownSystem();
     LinearStrategyModule<LevelLoad>::ShutdownSystem();
     LinearStrategyModule<GlobalLoad>::ShutdownSystem();
@@ -42,12 +64,17 @@ void AllocatorEngine::Shutdown()
     PoolModule<BucketScope<128>>::ShutdownSystem();
     PoolModule<BucketScope<256>>::ShutdownSystem();
 
+    LOG_ALLOCATOR("DEBUG", "Engine: Clearing Handle Table...");
     m_HandleTable.Clear();
+
+    LOG_ALLOCATOR("SYSTEM", "Engine: Shutdown Complete.");
 }
 
 template <typename TScope> void AllocatorEngine::PrintStats(const char* ScopeName) const noexcept
 {
     ContextStats::Snapshot Snap;
+
+    LOG_ALLOCATOR("DEBUG", "Engine: Collecting stats for " << ScopeName);
 
     if constexpr (ScopeTraits<TScope>::SupportsHandles) {
         using Bucket = typename PoolMap<TScope::g_BucketSize>::Type;
@@ -58,58 +85,45 @@ template <typename TScope> void AllocatorEngine::PrintStats(const char* ScopeNam
         Snap = LinearStrategyModule<TScope>::GetGlobalStats().GetSnapshot();
     }
 
-    std::cout << "\n[" << ScopeName << " Stats]\n";
-    std::cout << "  Allocated : " << FormatBytes(Snap.Allocated) << "\n";
-    std::cout << "  Current   : " << FormatBytes(Snap.Current) << "\n";
-    std::cout << "  Peak      : " << FormatBytes(Snap.Peak) << "\n";
-    std::cout << "  Count     : " << Snap.Count << "\n";
+    auto FormatBytes = [](size_t Bytes) -> std::string {
+        std::stringstream ss;
+        if (Bytes < g_BytesPerKB)
+            ss << Bytes << " B";
+        else if (Bytes < g_BytesPerMB)
+            ss << std::fixed << std::setprecision(2) << (double)Bytes / g_BytesPerKB << " KB";
+        else
+            ss << std::fixed << std::setprecision(2) << (double)Bytes / g_BytesPerMB << " MB";
+        return ss.str();
+    };
+
+    std::cout << "\n[" << ScopeName << "]\n"
+              << "  Allocated : " << FormatBytes(Snap.BytesAllocated) << "\n"
+              << "  Current   : " << FormatBytes(Snap.BytesAllocated - Snap.BytesFreed) << "\n"
+              << "  Peak      : " << FormatBytes(Snap.PeakUsage) << "\n"
+              << "  Count     : " << Snap.AllocationCount << "\n";
 }
 
 void AllocatorEngine::GenerateFullReport() const noexcept
 {
-    std::cout << "================================================================\n";
-    std::cout << "                   MEMORY ALLOCATION REPORT                     \n";
-    std::cout << "================================================================\n";
+    std::cout << "================================================================\n"
+              << "                    ALLOCATOR PERFORMANCE REPORT                \n"
+              << "================================================================\n";
 
-    PrintStats<FrameLoad>("Linear: FrameLoad");
-    PrintStats<LevelLoad>("Linear: LevelLoad");
-    PrintStats<GlobalLoad>("Linear: GlobalLoad");
+    PrintStats<FrameLoad>("Linear: Frame");
+    PrintStats<LevelLoad>("Linear: Level");
+    PrintStats<GlobalLoad>("Linear: Global");
 
-    std::cout << "\n--- Shared Pool Buckets ---";
+    std::cout << "\n--- Fixed Size Pool Buckets ---";
     PrintStats<BucketScope<16>>("Pool: 16B");
     PrintStats<BucketScope<32>>("Pool: 32B");
     PrintStats<BucketScope<64>>("Pool: 64B");
     PrintStats<BucketScope<128>>("Pool: 128B");
     PrintStats<BucketScope<256>>("Pool: 256B");
 
-    std::cout << "\n[System Overview]\n";
-    std::cout << "  Handle Capacity: " << m_HandleTable.GetCapacity() << "\n";
-    std::cout << "  Active Handles : " << m_HandleTable.GetActiveCount() << "\n";
-    std::cout << "================================================================\n";
-}
-
-void AllocatorEngine::ReportError(const char* Msg, std::source_location Loc) const noexcept
-{
-    std::cerr << "[Allocator ERROR] " << Msg << "\n"
-              << "  File: " << Loc.file_name() << ":" << Loc.line() << "\n"
-              << "  Func: " << Loc.function_name() << "\n";
-}
-
-std::string AllocatorEngine::FormatBytes(size_t Bytes) noexcept
-{
-    std::stringstream StringStream;
-    if (Bytes < g_BytesPerKB) {
-        StringStream << Bytes << " B";
-    }
-    else if (Bytes < g_BytesPerMB) {
-        StringStream << std::fixed << std::setprecision(2)
-                     << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerKB)) << " KB";
-    }
-    else {
-        StringStream << std::fixed << std::setprecision(2)
-                     << (static_cast<double>(Bytes) / static_cast<double>(g_BytesPerMB)) << " MB";
-    }
-    return StringStream.str();
+    std::cout << "\n[Registry State]\n"
+              << "  Handles Active: " << m_HandleTable.GetActiveCount() << " / "
+              << m_HandleTable.GetCapacity() << "\n"
+              << "================================================================\n";
 }
 
 template void AllocatorEngine::PrintStats<FrameLoad>(const char*) const noexcept;
