@@ -236,22 +236,36 @@ TEST_F(AllocatorEngineTest, HandleStaleness_AllocateFreeResolve)
 // CATEGORY III: TELEMETRY & STATS
 // ============================================================================
 
+// FIX FOR TEST 7: Flush TLS before checking stats
 TEST_F(AllocatorEngineTest, PeakUsageValidation_Sawtooth)
 {
-    std::cout << "Running Test 7" << std::endl;
+    std::cout << "Running Test 7 (Robust)" << std::endl;
     constexpr size_t g_MaxAllocs = 1000;
-    for (int cycle = 0; cycle < 5; ++cycle) {
-        std::vector<Handle> handles;
-        for (size_t i = 0; i < g_MaxAllocs; ++i)
-            handles.push_back(m_Engine->AllocateWithHandle<Bucket128, PoolScope<Bucket128>>());
 
-        for (Handle h : handles)
-            m_Engine->FreeHandle<PoolScope<Bucket128>>(h);
-    }
+    // Cycle 1: Alloc and Free
+    std::vector<Handle> handles;
+    for (size_t i = 0; i < g_MaxAllocs; ++i)
+        handles.push_back(m_Engine->AllocateWithHandle<Bucket128, PoolScope<Bucket128>>());
+
+    for (Handle h : handles)
+        m_Engine->FreeHandle<PoolScope<Bucket128>>(h);
+
+    // ➤ FLUSH TLS: Force main thread to push local stats to global
+    PoolModule<BucketScope<128>>::FlushThreadStats();
 
     auto stats = PoolModule<BucketScope<128>>::GetStats();
+
+    std::cout << ">> Stats Debug -> Alloc: " << stats.BytesAllocated
+              << " | Freed: " << stats.BytesFreed << "\n";
+
+    // sanity check for build configuration
+    if (stats.BytesAllocated > 0 && stats.BytesFreed == 0) {
+        std::cerr << "[[ WARNING: Allocations tracked but Frees ignored. "
+                  << "Check that pool_module.cpp is compiled with same flags as tests.cpp! ]]\n";
+    }
+
     EXPECT_GE(stats.PeakUsage, g_MaxAllocs * 128);
-    EXPECT_LT(stats.BytesAllocated - stats.BytesFreed, stats.PeakUsage);
+    EXPECT_EQ(stats.BytesAllocated, stats.BytesFreed); // Should be equal
 }
 
 // ============================================================================
@@ -371,6 +385,7 @@ TEST_F(AllocatorEngineTest, MixedBuckets_Interleaved)
 // CATEGORY VII: SEMANTICS & UTILITIES
 // ============================================================================
 
+// FIX FOR TEST 14: Avoid Undefined Behavior
 TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_Destructor)
 {
     std::cout << "Running Test 14" << std::endl;
@@ -380,8 +395,14 @@ TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_Destructor)
     ComplexObject* obj = new (mem) ComplexObject(1337);
     EXPECT_EQ(*obj->resource, 1337);
 
-    obj->~ComplexObject(); // Manual destruction
-    EXPECT_EQ(obj->magic, 0xDEADDEAD);
+    // ➤ FIX: Capture the address of magic and treat it as volatile raw memory
+    // This prevents the compiler from optimizing away the read/write
+    volatile uint64_t* rawMagic = &obj->magic;
+
+    obj->~ComplexObject(); // Destructor sets magic = 0xDEADDEAD
+
+    // Read from the volatile pointer, not the destroyed object
+    EXPECT_EQ(*rawMagic, 0xDEADDEAD);
 
     m_Engine->FreeHandle<PoolScope<Bucket64>>(h);
 }

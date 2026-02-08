@@ -56,36 +56,25 @@ public:
     static void ShutdownModule() noexcept;
     static void ShutdownSystem() noexcept;
 
-public:
     static inline void FlushThreadStats() noexcept
     {
         ALLOCATOR_DIAGNOSTIC({
             auto& tls = GetTLS();
-
             if (tls.BytesAllocated > 0 || tls.BytesFreed > 0 || tls.AllocCount > 0 ||
                 tls.FreeCount > 0) {
-
-                if (tls.BytesAllocated > 0) {
+                if (tls.BytesAllocated > 0)
                     g_Stats.BytesAllocated.fetch_add(tls.BytesAllocated, std::memory_order_relaxed);
-                }
-
-                if (tls.BytesFreed > 0) {
+                if (tls.BytesFreed > 0)
                     g_Stats.BytesFreed.fetch_add(tls.BytesFreed, std::memory_order_relaxed);
-                }
-
-                if (tls.AllocCount > 0) {
+                if (tls.AllocCount > 0)
                     g_Stats.AllocationCount.fetch_add(tls.AllocCount, std::memory_order_relaxed);
-                }
-
-                if (tls.FreeCount > 0) {
+                if (tls.FreeCount > 0)
                     g_Stats.AllocationCount.fetch_sub(tls.FreeCount, std::memory_order_relaxed);
-                }
 
                 tls.BytesAllocated = 0;
                 tls.BytesFreed = 0;
                 tls.AllocCount = 0;
                 tls.FreeCount = 0;
-
                 UpdatePeakUsage();
             }
         });
@@ -102,14 +91,10 @@ public:
             Result = PoolStrategy::Allocate(*tls.ActiveSlab);
         }
         else {
-            LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize
-                                           << "B]: Active Slab full or NULL. Searching chain...");
-
+            LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Searching chain...");
             SlabDescriptor* Current = (tls.FirstNonFullSlab) ? tls.FirstNonFullSlab : tls.HeadSlab;
             while (Current) {
                 if (PoolStrategy::CanFit(*Current)) {
-                    LOG_ALLOCATOR("DEBUG",
-                                  "Pool[" << g_ChunkSize << "B]: Found available slab in chain.");
                     tls.ActiveSlab = Current;
                     tls.FirstNonFullSlab = Current;
                     Result = PoolStrategy::Allocate(*tls.ActiveSlab);
@@ -119,24 +104,14 @@ public:
             }
 
             if (!Result) {
-                LOG_ALLOCATOR("DEBUG",
-                              "Pool[" << g_ChunkSize << "B]: Chain exhausted. Requesting growth.");
+                LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Chain exhausted. Growing.");
                 GrowSlabChain();
-
-                if (tls.ActiveSlab) {
-                    LOG_ALLOCATOR("DEBUG",
-                                  "Pool[" << g_ChunkSize << "B]: Allocation after growth.");
+                if (tls.ActiveSlab)
                     Result = PoolStrategy::Allocate(*tls.ActiveSlab);
-                }
-                else {
-                    LOG_ALLOCATOR("CRITICAL", "Pool[" << g_ChunkSize << "B]: Growth FAILED.");
-                }
             }
         }
 
         if (Result != nullptr) [[likely]] {
-            LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Success. Ptr: " << Result);
-
             ALLOCATOR_DIAGNOSTIC({
                 tls.AllocCount++;
                 tls.BytesAllocated += g_ChunkSize;
@@ -145,11 +120,35 @@ public:
         else {
             LOG_ALLOCATOR("ERROR", "Pool[" << g_ChunkSize << "B]: Failed to return memory.");
         }
-
         return Result;
     }
 
-    static void Free(void* MemoryToFree) noexcept;
+    static void Free(void* MemoryToFree) noexcept
+    {
+        if (MemoryToFree == nullptr) [[unlikely]]
+            return;
+
+        SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
+        if (!Registry) [[unlikely]]
+            return;
+
+        SlabDescriptor* Slab = Registry->GetSlabDescriptor(MemoryToFree);
+
+        if (Slab) [[likely]] {
+            PoolStrategy::Free(*Slab, MemoryToFree);
+
+            ALLOCATOR_DIAGNOSTIC({
+                auto& tls = GetTLS();
+                tls.BytesFreed += g_ChunkSize;
+                tls.FreeCount++;
+            });
+        }
+        else {
+            LOG_ALLOCATOR("ERROR",
+                          "Pool: Attempted to free invalid ptr (Not in Arena): " << MemoryToFree);
+        }
+    }
+
     static ContextStats::Snapshot GetStats() noexcept { return g_Stats.GetSnapshot(); }
 };
 

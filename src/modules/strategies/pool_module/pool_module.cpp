@@ -12,33 +12,6 @@ template <typename TContext> std::mutex PoolModule<TContext>::g_ContextMutex;
 template <typename TContext> std::vector<SlabDescriptor**> PoolModule<TContext>::g_ThreadHeads;
 template <typename TContext> ContextStats PoolModule<TContext>::g_Stats;
 
-template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree) noexcept
-{
-    if (MemoryToFree == nullptr) [[unlikely]]
-        return;
-
-    SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
-
-    if (!Registry) [[unlikely]]
-        return;
-
-    SlabDescriptor* Slab = Registry->GetSlabDescriptor(MemoryToFree);
-
-    if (Slab) [[likely]] {
-        PoolStrategy::Free(*Slab, MemoryToFree);
-
-        ALLOCATOR_DIAGNOSTIC({
-            auto& tls = GetTLS();
-            tls.BytesFreed += g_ChunkSize;
-            tls.FreeCount++;
-        });
-    }
-    else {
-        LOG_ALLOCATOR("ERROR",
-                      "Pool: Attempted to free invalid ptr (Not in Arena): " << MemoryToFree);
-    }
-}
-
 template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
 {
     auto& tls = GetTLS();
@@ -114,7 +87,7 @@ void PoolModule<TContext>::UnregisterThreadContext(SlabDescriptor** ThreadHeadPt
 
 template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcept
 {
-    FlushThreadStats();
+    ALLOCATOR_DIAGNOSTIC({ FlushThreadStats(); });
 
     auto& tls = GetTLS();
     LOG_ALLOCATOR("INFO", "Pool[" << g_ChunkSize << "B]: Thread Shutdown.");

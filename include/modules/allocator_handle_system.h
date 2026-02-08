@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <atomic>
+#include <mutex>
 #include <utilities/allocator_utility.h>
 
 namespace Allocator {
@@ -36,6 +39,7 @@ struct HandleMetadata
     void* Pointer;
     uint32_t Generation;
     uint32_t NextFree;
+
     HandleMetadata() noexcept : Pointer(nullptr), Generation(1), NextFree(0) {}
 };
 
@@ -43,15 +47,19 @@ class HandleTable
 {
 private:
     static constexpr uint32_t g_ElementsPerPage = 1024;
-    static constexpr uint32_t g_MaxPages = 1024;
+
+    static constexpr uint32_t g_MaxPages = 65536;
+
     static constexpr uint32_t g_FreeListEnd = 0xFFFFFFFF;
     static constexpr uint32_t g_PageShift = 10;
     static constexpr uint32_t g_PageMask = g_ElementsPerPage - 1;
 
     std::array<std::atomic<HandleMetadata*>, g_MaxPages> m_Pages;
-    std::atomic<uint32_t> m_FreeListHead;
-    std::atomic<uint32_t> m_Capacity;
-    std::atomic<uint32_t> m_ActiveCount;
+
+    alignas(64) std::atomic<uint32_t> m_FreeListHead;
+    alignas(64) std::atomic<uint32_t> m_ActiveCount;
+    alignas(64) std::atomic<uint32_t> m_Capacity;
+
     mutable std::mutex m_GrowthMutex;
 
     bool GrowCapacity() noexcept;
