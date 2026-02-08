@@ -19,13 +19,15 @@ template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree)
 
     auto& tls = GetTLS();
     const uintptr_t Target = reinterpret_cast<uintptr_t>(MemoryToFree);
-    LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Freeing ptr " << MemoryToFree);
 
     if (tls.ActiveSlab) {
         const uintptr_t Start = tls.ActiveSlab->GetSlabStart();
         if (Target >= Start && Target < (Start + g_ConstSlabSize)) [[likely]] {
             PoolStrategy::Free(*tls.ActiveSlab, MemoryToFree);
+
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
+            g_Stats.AllocationCount.fetch_sub(1, std::memory_order_relaxed);
+
             return;
         }
     }
@@ -35,7 +37,10 @@ template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree)
         const uintptr_t Start = Current->GetSlabStart();
         if (Target >= Start && Target < (Start + g_ConstSlabSize)) {
             PoolStrategy::Free(*Current, MemoryToFree);
+
             g_Stats.BytesFreed.fetch_add(g_ChunkSize, std::memory_order_relaxed);
+            g_Stats.AllocationCount.fetch_sub(1, std::memory_order_relaxed);
+
             if (tls.ActiveSlab && !PoolStrategy::CanFit(*tls.ActiveSlab)) {
                 tls.ActiveSlab = Current;
             }
@@ -43,7 +48,8 @@ template <typename TContext> void PoolModule<TContext>::Free(void* MemoryToFree)
         }
         Current = Current->GetNextSlab();
     }
-    LOG_ALLOCATOR("ERROR", "Pool[" << g_ChunkSize << "B]: Free failed. Ptr not in pool.");
+
+    LOG_ALLOCATOR("ERROR", "Pool: Double-free or invalid ptr: " << MemoryToFree);
 }
 
 template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
@@ -79,14 +85,15 @@ template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
 
 template <typename TContext> void PoolModule<TContext>::UpdatePeakUsage() noexcept
 {
-    const size_t Alloc = g_Stats.BytesAllocated.load(std::memory_order_relaxed);
-    const size_t Freed = g_Stats.BytesFreed.load(std::memory_order_relaxed);
-    const size_t Current = (Alloc > Freed) ? (Alloc - Freed) : 0;
-    size_t Peak = g_Stats.PeakUsage.load(std::memory_order_relaxed);
-    while (Current > Peak) {
-        if (g_Stats.PeakUsage.compare_exchange_weak(Peak, Current, std::memory_order_relaxed))
-            break;
-    }
+    size_t allocated = g_Stats.BytesAllocated.load(std::memory_order_relaxed);
+    size_t freed = g_Stats.BytesFreed.load(std::memory_order_relaxed);
+
+    size_t current = (allocated > freed) ? (allocated - freed) : 0;
+
+    size_t peak = g_Stats.PeakUsage.load(std::memory_order_relaxed);
+    while (current > peak &&
+           !g_Stats.PeakUsage.compare_exchange_weak(peak, current, std::memory_order_relaxed))
+        ;
 }
 
 template <typename TContext>

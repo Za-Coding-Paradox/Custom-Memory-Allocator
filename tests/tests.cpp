@@ -21,7 +21,7 @@ class AllocatorEngineTest : public ::testing::Test
 protected:
     static constexpr size_t g_TestSlabSize = 64 * 1024;
     // 64MB Arena provides enough room for stress but small enough to hit OOM quickly
-    static constexpr size_t g_TestArenaSize = 64 * 1024 * 1024;
+    static constexpr size_t g_TestArenaSize = 128 * 1024 * 1024;
 
     AllocatorEngine* m_Engine = nullptr;
 
@@ -104,6 +104,8 @@ struct ComplexObject
 
 TEST_F(AllocatorEngineTest, HighFrequencyThrashing_1MillionAllocs_16Threads)
 {
+    std::cout << "Running::HighFrequencyThrashing_1MillionAllocs_16Threads\n";
+
     constexpr size_t g_AllocationsPerThread = 1'000'000;
     constexpr size_t g_ThreadCount = 16;
     constexpr size_t g_AllocationSize = 128;
@@ -145,6 +147,7 @@ TEST_F(AllocatorEngineTest, HighFrequencyThrashing_1MillionAllocs_16Threads)
 
 TEST_F(AllocatorEngineTest, ContentionStorm_SimultaneousSlabRequests)
 {
+    std::cout << "Running Test 2 " << std::endl;
     constexpr size_t g_ThreadCount = 32;
     std::barrier sync_point(g_ThreadCount);
     std::atomic<size_t> g_SuccessfulSlabGets{0};
@@ -157,6 +160,8 @@ TEST_F(AllocatorEngineTest, ContentionStorm_SimultaneousSlabRequests)
         LinearStrategyModule<FrameLoad>::ShutdownModule();
     };
 
+    std::cout << "I reached outside" << std::endl;
+
     std::vector<std::thread> threads;
     for (size_t i = 0; i < g_ThreadCount; ++i)
         threads.emplace_back(worker);
@@ -168,6 +173,7 @@ TEST_F(AllocatorEngineTest, ContentionStorm_SimultaneousSlabRequests)
 
 TEST_F(AllocatorEngineTest, SlabExhaustion_FillArena_VerifyOOM_ThenRecover)
 {
+    std::cout << "Running Test 3" << std::endl;
     constexpr size_t g_LargeAllocationSize = 32 * 1024;
 
     // Phase 1: Fill entire 64MB Arena
@@ -178,6 +184,8 @@ TEST_F(AllocatorEngineTest, SlabExhaustion_FillArena_VerifyOOM_ThenRecover)
             break;
         count++;
     }
+
+    std::cout << "I reached outside again" << std::endl;
 
     // Verify OOM
     EXPECT_EQ(m_Engine->Allocate<GlobalLoad>(1024), nullptr);
@@ -195,11 +203,13 @@ TEST_F(AllocatorEngineTest, SlabExhaustion_FillArena_VerifyOOM_ThenRecover)
 
 TEST_F(AllocatorEngineTest, ZeroByteAllocation_MustReturnNull)
 {
+    std::cout << "Running Test 4 " << std::endl;
     EXPECT_EQ(m_Engine->Allocate<FrameLoad>(0), nullptr);
 }
 
 TEST_F(AllocatorEngineTest, AlignmentNightmare_VariousPowersOfTwo)
 {
+    std::cout << "Running Test 5 " << std::endl;
     size_t alignments[] = {1, 8, 16, 64, 128, 512, 4096};
     for (size_t align : alignments) {
         void* ptr = m_Engine->Allocate<GlobalLoad>(128, align);
@@ -211,6 +221,7 @@ TEST_F(AllocatorEngineTest, AlignmentNightmare_VariousPowersOfTwo)
 
 TEST_F(AllocatorEngineTest, HandleStaleness_AllocateFreeResolve)
 {
+    std::cout << "Running Test 6 " << std::endl;
     Handle h = m_Engine->AllocateWithHandle<Bucket64, PoolScope<Bucket64>>();
     ASSERT_NE(h, g_InvalidHandle);
 
@@ -227,6 +238,7 @@ TEST_F(AllocatorEngineTest, HandleStaleness_AllocateFreeResolve)
 
 TEST_F(AllocatorEngineTest, PeakUsageValidation_Sawtooth)
 {
+    std::cout << "Running Test 7" << std::endl;
     constexpr size_t g_MaxAllocs = 1000;
     for (int cycle = 0; cycle < 5; ++cycle) {
         std::vector<Handle> handles;
@@ -248,6 +260,7 @@ TEST_F(AllocatorEngineTest, PeakUsageValidation_Sawtooth)
 
 TEST_F(HandleSystemTest, ConcurrentHandleAllocation_MassiveContention)
 {
+    std::cout << "Running Test 8 " << std::endl;
     constexpr size_t g_ThreadCount = 16;
     constexpr size_t g_HandlesPerThread = 2000;
     std::atomic<size_t> totalAllocated{0};
@@ -276,6 +289,7 @@ TEST_F(HandleSystemTest, ConcurrentHandleAllocation_MassiveContention)
 
 TEST_F(HandleSystemTest, DoubleFree_Safety)
 {
+    std::cout << "Running Test 9" << std::endl;
     int dummy = 42;
     Handle h = m_Table->Allocate(&dummy);
     EXPECT_TRUE(m_Table->Free(h));
@@ -288,6 +302,7 @@ TEST_F(HandleSystemTest, DoubleFree_Safety)
 
 TEST_F(AllocatorEngineTest, LinearScopedMarker_RecursiveRewind)
 {
+    std::cout << "Running Test 10" << std::endl;
     void* base = m_Engine->Allocate<LevelLoad>(16);
     {
         LinearScopedMarker<LevelLoad> outer;
@@ -307,6 +322,7 @@ TEST_F(AllocatorEngineTest, LinearScopedMarker_RecursiveRewind)
 
 TEST_F(AllocatorEngineTest, RecursiveOverflow_ChainIntegrity)
 {
+    std::cout << "Running Test 12" << std::endl;
     constexpr size_t g_AllocSize = 60 * 1024; // Forces a new slab almost every time
     std::vector<void*> ptrs;
     for (int i = 0; i < 20; ++i) {
@@ -329,6 +345,7 @@ TEST_F(AllocatorEngineTest, RecursiveOverflow_ChainIntegrity)
 
 TEST_F(AllocatorEngineTest, MixedBuckets_Interleaved)
 {
+    std::cout << "Running Test 13" << std::endl;
     std::vector<Handle> h16, h64, h256;
     for (int i = 0; i < 1000; ++i) {
         h16.push_back(m_Engine->AllocateWithHandle<Bucket16, PoolScope<Bucket16>>());
@@ -356,6 +373,7 @@ TEST_F(AllocatorEngineTest, MixedBuckets_Interleaved)
 
 TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_Destructor)
 {
+    std::cout << "Running Test 14" << std::endl;
     Handle h = m_Engine->AllocateWithHandle<ComplexObject, PoolScope<Bucket64>>();
     void* mem = m_Engine->ResolveHandle<ComplexObject>(h);
 
@@ -370,6 +388,7 @@ TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_Destructor)
 
 TEST(UtilityTest, PowerOfTwo_Alignment)
 {
+    std::cout << "Running Test 15 " << std::endl;
     EXPECT_TRUE(Utility::IsPowerOfTwo(1024));
     EXPECT_FALSE(Utility::IsPowerOfTwo(1025));
     EXPECT_EQ(Utility::AlignForward((void*)0x1001, 16), (void*)0x1010);
@@ -382,6 +401,7 @@ TEST(UtilityTest, PowerOfTwo_Alignment)
 
 TEST_F(AllocatorEngineTest, Performance_LinearSubMicrosecond)
 {
+    std::cout << "Running Test 16 " << std::endl;
     constexpr size_t iterations = 100'000;
     auto start = high_resolution_clock::now();
     for (size_t i = 0; i < iterations; ++i) {
@@ -398,6 +418,7 @@ TEST_F(AllocatorEngineTest, Performance_LinearSubMicrosecond)
 
 TEST_F(AllocatorEngineTest, Performance_HandleResolution_Blazing)
 {
+    std::cout << "Running Test 17 " << std::endl;
     Handle h = m_Engine->AllocateWithHandle<Bucket64, PoolScope<Bucket64>>();
     constexpr size_t iterations = 1'000'000;
 

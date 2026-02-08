@@ -18,15 +18,23 @@ void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
                                                        size_t AllocationAlignment) noexcept
 {
     auto& tls = GetTLS();
-    SlabDescriptor* NextSlab = tls.ActiveSlab->GetNextSlab();
+    SlabDescriptor* OldSlab = tls.ActiveSlab;
+    SlabDescriptor* NextSlab = OldSlab->GetNextSlab();
 
     if (NextSlab != nullptr) {
         tls.ActiveSlab = NextSlab;
+        NextSlab = tls.ActiveSlab->GetNextSlab();
         LinearStrategy::Reset(*tls.ActiveSlab);
+        tls.ActiveSlab->SetNextSlab(NextSlab);
         return Allocate(AllocationSize, AllocationAlignment);
     }
 
     GrowSlabChain();
+
+    if (tls.ActiveSlab == OldSlab) [[unlikely]] {
+        return nullptr;
+    }
+
     return (tls.ActiveSlab != nullptr) ? Allocate(AllocationSize, AllocationAlignment) : nullptr;
 }
 
@@ -67,6 +75,9 @@ void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInst
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept
 {
     auto& tls = GetTLS();
+    if (!tls.HeadSlab)
+        return;
+
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
 
     UnregisterThreadContext(&tls.HeadSlab);

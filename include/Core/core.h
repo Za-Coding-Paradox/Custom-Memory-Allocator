@@ -69,7 +69,7 @@ inline std::mutex g_LogMutex;
 #ifndef NDEBUG
 #define ALLOCATOR_DIAGNOSTIC(code) code
 #else
-#define ALLOCATOR_DIAGNOSTIC(code) ((void)0)
+#define ALLOCATOR_DIAGNOSTIC(code) code
 #endif
 
 #ifdef NDEBUG

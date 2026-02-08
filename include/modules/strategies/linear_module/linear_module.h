@@ -96,7 +96,7 @@ public:
         if (tls.ActiveSlab == nullptr) [[unlikely]] {
             LOG_ALLOCATOR("DEBUG", "[L-ALLOC] No active slab. Growing...");
             GrowSlabChain();
-            if (tls.ActiveSlab == nullptr) {
+            if (tls.ActiveSlab == nullptr) [[unlikely]] {
                 LOG_ALLOCATOR("CRITICAL", "[L-ALLOC] Growth FAILED.");
                 return nullptr;
             }
