@@ -239,33 +239,42 @@ TEST_F(AllocatorEngineTest, HandleStaleness_AllocateFreeResolve)
 // FIX FOR TEST 7: Flush TLS before checking stats
 TEST_F(AllocatorEngineTest, PeakUsageValidation_Sawtooth)
 {
-    std::cout << "Running Test 7 (Robust)" << std::endl;
+    std::cout << "Running Test 7 (Fixed for TLS Architecture)" << std::endl;
     constexpr size_t g_MaxAllocs = 1000;
 
-    // Cycle 1: Alloc and Free
-    std::vector<Handle> handles;
-    for (size_t i = 0; i < g_MaxAllocs; ++i)
-        handles.push_back(m_Engine->AllocateWithHandle<Bucket128, PoolScope<Bucket128>>());
+    for (int cycle = 0; cycle < 5; ++cycle) {
+        std::vector<Handle> handles;
 
-    for (Handle h : handles)
-        m_Engine->FreeHandle<PoolScope<Bucket128>>(h);
+        // 1. CLIMB: Allocate everything
+        for (size_t i = 0; i < g_MaxAllocs; ++i)
+            handles.push_back(m_Engine->AllocateWithHandle<Bucket128, PoolScope<Bucket128>>());
 
-    // ➤ FLUSH TLS: Force main thread to push local stats to global
-    PoolModule<BucketScope<128>>::FlushThreadStats();
+        // ➤ FIX: Flush HERE.
+        // We are at the top of the "sawtooth". We must commit stats now
+        // so the Global Peak counter sees this high water mark.
+        PoolModule<BucketScope<128>>::FlushThreadStats();
+
+        // 2. FALL: Free everything
+        for (Handle h : handles) {
+            m_Engine->FreeHandle<Bucket128>(h);
+        }
+
+        // (Optional) Flush here if you want to verify usage went back to zero
+        // PoolModule<BucketScope<128>>::FlushThreadStats();
+    }
 
     auto stats = PoolModule<BucketScope<128>>::GetStats();
 
     std::cout << ">> Stats Debug -> Alloc: " << stats.BytesAllocated
-              << " | Freed: " << stats.BytesFreed << "\n";
-
-    // sanity check for build configuration
-    if (stats.BytesAllocated > 0 && stats.BytesFreed == 0) {
-        std::cerr << "[[ WARNING: Allocations tracked but Frees ignored. "
-                  << "Check that pool_module.cpp is compiled with same flags as tests.cpp! ]]\n";
-    }
+              << " | Freed: " << stats.BytesFreed << " | Peak: " << stats.PeakUsage << "\n";
 
     EXPECT_GE(stats.PeakUsage, g_MaxAllocs * 128);
-    EXPECT_EQ(stats.BytesAllocated, stats.BytesFreed); // Should be equal
+
+    // Total Allocated and Freed should still match at the end
+    // (We flush one last time just to be sure we caught the frees from the last cycle)
+    PoolModule<BucketScope<128>>::FlushThreadStats();
+    stats = PoolModule<BucketScope<128>>::GetStats();
+    EXPECT_EQ(stats.BytesAllocated, stats.BytesFreed);
 }
 
 // ============================================================================
@@ -385,26 +394,40 @@ TEST_F(AllocatorEngineTest, MixedBuckets_Interleaved)
 // CATEGORY VII: SEMANTICS & UTILITIES
 // ============================================================================
 
-// FIX FOR TEST 14: Avoid Undefined Behavior
+// 1. Global flag to track if the destructor actually ran
+static bool g_DestructorRan = false;
+
+// 2. A special struct just for this test
+struct TrackedObject
+{
+    int payload;
+    TrackedObject(int v) : payload(v) { g_DestructorRan = false; }
+    ~TrackedObject() { g_DestructorRan = true; }
+};
+
 TEST_F(AllocatorEngineTest, ComplexTypes_PlacementNew_Destructor)
 {
-    std::cout << "Running Test 14" << std::endl;
-    Handle h = m_Engine->AllocateWithHandle<ComplexObject, PoolScope<Bucket64>>();
-    void* mem = m_Engine->ResolveHandle<ComplexObject>(h);
+    std::cout << "Running Test 14 (Side-Effect Verification)" << std::endl;
 
-    ComplexObject* obj = new (mem) ComplexObject(1337);
-    EXPECT_EQ(*obj->resource, 1337);
+    // Allocate memory
+    Handle h = m_Engine->AllocateWithHandle<TrackedObject, PoolScope<TrackedObject>>();
+    void* mem = m_Engine->ResolveHandle<TrackedObject>(h);
 
-    // ➤ FIX: Capture the address of magic and treat it as volatile raw memory
-    // This prevents the compiler from optimizing away the read/write
-    volatile uint64_t* rawMagic = &obj->magic;
+    // 1. Construct the object in-place
+    TrackedObject* obj = new (mem) TrackedObject(42);
 
-    obj->~ComplexObject(); // Destructor sets magic = 0xDEADDEAD
+    EXPECT_EQ(obj->payload, 42);
+    EXPECT_FALSE(g_DestructorRan); // Destructor shouldn't have run yet
 
-    // Read from the volatile pointer, not the destroyed object
-    EXPECT_EQ(*rawMagic, 0xDEADDEAD);
+    // 2. Destruct Manually
+    obj->~TrackedObject();
 
-    m_Engine->FreeHandle<PoolScope<Bucket64>>(h);
+    // 3. Verify the Side Effect
+    // If this is true, the destructor DEFINITELY ran.
+    EXPECT_TRUE(g_DestructorRan);
+
+    // Free the memory
+    m_Engine->FreeHandle<TrackedObject>(h);
 }
 
 TEST(UtilityTest, PowerOfTwo_Alignment)
