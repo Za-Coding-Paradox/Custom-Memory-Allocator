@@ -74,6 +74,8 @@ void LinearStrategyModule<TContext>::InitializeModule(SlabRegistry* RegistryInst
 
 template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule() noexcept
 {
+    ALLOCATOR_DIAGNOSTIC({ FlushThreadStats(); });
+
     auto& tls = GetTLS();
     if (!tls.HeadSlab)
         return;
@@ -127,7 +129,8 @@ void LinearStrategyModule<TContext>::Reset() noexcept
             Current = NextSlab;
         }
         tls.ActiveSlab = tls.HeadSlab;
-        FlushThreadStats();
+
+        ALLOCATOR_DIAGNOSTIC({ FlushThreadStats(); });
     }
 }
 
@@ -184,7 +187,8 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
                 Current = NextSlab;
             }
             tls.ActiveSlab = tls.HeadSlab;
-            FlushThreadStats();
+
+            ALLOCATOR_DIAGNOSTIC({ FlushThreadStats(); });
         }
         return;
     }

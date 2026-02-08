@@ -250,8 +250,8 @@ TEST_F(AllocatorEngineTest, PeakUsageValidation_Sawtooth)
     }
 
     auto stats = PoolModule<BucketScope<128>>::GetStats();
-    EXPECT_GE(stats.Peak, g_MaxAllocs * 128);
-    EXPECT_LT(stats.Current, stats.Peak);
+    EXPECT_GE(stats.PeakUsage, g_MaxAllocs * 128);
+    EXPECT_LT(stats.BytesAllocated - stats.BytesFreed, stats.PeakUsage);
 }
 
 // ============================================================================

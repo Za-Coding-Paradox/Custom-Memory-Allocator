@@ -14,6 +14,7 @@ public:
     {
         SlabDescriptor* HeadSlab = nullptr;
         SlabDescriptor* ActiveSlab = nullptr;
+
         size_t ThreadAllocated = 0;
         size_t ThreadFreed = 0;
         size_t ThreadCount = 0;
@@ -52,31 +53,37 @@ public:
 
     static inline size_t GetThreadTotalUsed() noexcept
     {
-        auto& tls = GetTLS();
         size_t TotalUsed = 0;
-        SlabDescriptor* Current = tls.HeadSlab;
-        while (Current != nullptr) {
-            TotalUsed += static_cast<size_t>(Current->GetFreeListHead() - Current->GetSlabStart());
-            if (Current == tls.ActiveSlab)
-                break;
-            Current = Current->GetNextSlab();
-        }
+        ALLOCATOR_DIAGNOSTIC({
+            auto& tls = GetTLS();
+            SlabDescriptor* Current = tls.HeadSlab;
+            while (Current != nullptr) {
+                TotalUsed +=
+                    static_cast<size_t>(Current->GetFreeListHead() - Current->GetSlabStart());
+                if (Current == tls.ActiveSlab)
+                    break;
+                Current = Current->GetNextSlab();
+            }
+        });
         return TotalUsed;
     }
 
     static inline void FlushThreadStats() noexcept
     {
-        auto& tls = GetTLS();
-        if (tls.ThreadAllocated > 0 || tls.ThreadFreed > 0 || tls.ThreadCount > 0) {
-            g_GlobalStats.BytesAllocated.fetch_add(tls.ThreadAllocated, std::memory_order_relaxed);
-            g_GlobalStats.BytesFreed.fetch_add(tls.ThreadFreed, std::memory_order_relaxed);
-            g_GlobalStats.AllocationCount.fetch_add(tls.ThreadCount, std::memory_order_relaxed);
+        ALLOCATOR_DIAGNOSTIC({
+            auto& tls = GetTLS();
+            if (tls.ThreadAllocated > 0 || tls.ThreadFreed > 0 || tls.ThreadCount > 0) {
+                g_GlobalStats.BytesAllocated.fetch_add(tls.ThreadAllocated,
+                                                       std::memory_order_relaxed);
+                g_GlobalStats.BytesFreed.fetch_add(tls.ThreadFreed, std::memory_order_relaxed);
+                g_GlobalStats.AllocationCount.fetch_add(tls.ThreadCount, std::memory_order_relaxed);
 
-            tls.ThreadAllocated = 0;
-            tls.ThreadFreed = 0;
-            tls.ThreadCount = 0;
-            tls.ThreadPeak = 0;
-        }
+                tls.ThreadAllocated = 0;
+                tls.ThreadFreed = 0;
+                tls.ThreadCount = 0;
+                tls.ThreadPeak = 0;
+            }
+        });
     }
 
     [[nodiscard]] __attribute__((always_inline)) static void*
@@ -115,10 +122,12 @@ public:
         }
 
         if (Result != nullptr) [[likely]] {
-            tls.ThreadCount++;
             LOG_ALLOCATOR("DEBUG", "[L-ALLOC] Success! Ptr: " << Result);
 
             ALLOCATOR_DIAGNOSTIC({
+                tls.ThreadCount++;
+                tls.ThreadAllocated += AllocationSize;
+
                 size_t CurrentUsed = GetThreadTotalUsed();
                 if (CurrentUsed > tls.ThreadPeak)
                     tls.ThreadPeak = CurrentUsed;

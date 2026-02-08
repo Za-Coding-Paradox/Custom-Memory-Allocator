@@ -17,6 +17,8 @@ public:
     [[nodiscard]] __attribute__((always_inline)) static inline void*
     Allocate(SlabDescriptor& SlabToAllocate) noexcept
     {
+        std::lock_guard<std::mutex> Lock(SlabToAllocate.GetMutex());
+
         const uintptr_t AvailableAddress = SlabToAllocate.GetFreeListHead();
 
         if (AvailableAddress == 0) [[unlikely]] {
@@ -30,6 +32,7 @@ public:
         ALLOCATOR_DIAGNOSTIC({ SlabToAllocate.IncrementActiveSlots(); });
 
         return reinterpret_cast<void*>(AvailableAddress);
+        // ➤ Lock releases automatically here
     }
 
     [[nodiscard]] __attribute__((always_inline)) static inline bool

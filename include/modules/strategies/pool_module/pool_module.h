@@ -21,6 +21,11 @@ public:
         SlabDescriptor* ActiveSlab = nullptr;
         SlabDescriptor* HeadSlab = nullptr;
         SlabDescriptor* FirstNonFullSlab = nullptr;
+
+        size_t BytesAllocated = 0;
+        size_t BytesFreed = 0;
+        size_t AllocCount = 0;
+        size_t FreeCount = 0;
     };
 
 private:
@@ -50,6 +55,41 @@ public:
     static void InitializeModule(SlabRegistry* RegistryInstance) noexcept;
     static void ShutdownModule() noexcept;
     static void ShutdownSystem() noexcept;
+
+public:
+    static inline void FlushThreadStats() noexcept
+    {
+        ALLOCATOR_DIAGNOSTIC({
+            auto& tls = GetTLS();
+
+            if (tls.BytesAllocated > 0 || tls.BytesFreed > 0 || tls.AllocCount > 0 ||
+                tls.FreeCount > 0) {
+
+                if (tls.BytesAllocated > 0) {
+                    g_Stats.BytesAllocated.fetch_add(tls.BytesAllocated, std::memory_order_relaxed);
+                }
+
+                if (tls.BytesFreed > 0) {
+                    g_Stats.BytesFreed.fetch_add(tls.BytesFreed, std::memory_order_relaxed);
+                }
+
+                if (tls.AllocCount > 0) {
+                    g_Stats.AllocationCount.fetch_add(tls.AllocCount, std::memory_order_relaxed);
+                }
+
+                if (tls.FreeCount > 0) {
+                    g_Stats.AllocationCount.fetch_sub(tls.FreeCount, std::memory_order_relaxed);
+                }
+
+                tls.BytesAllocated = 0;
+                tls.BytesFreed = 0;
+                tls.AllocCount = 0;
+                tls.FreeCount = 0;
+
+                UpdatePeakUsage();
+            }
+        });
+    }
 
     [[nodiscard]] __attribute__((always_inline)) static void* Allocate() noexcept
     {
@@ -96,9 +136,11 @@ public:
 
         if (Result != nullptr) [[likely]] {
             LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Success. Ptr: " << Result);
-            g_Stats.AllocationCount.fetch_add(1, std::memory_order_relaxed);
-            g_Stats.BytesAllocated.fetch_add(g_ChunkSize, std::memory_order_relaxed);
-            ALLOCATOR_DIAGNOSTIC({ UpdatePeakUsage(); });
+
+            ALLOCATOR_DIAGNOSTIC({
+                tls.AllocCount++;
+                tls.BytesAllocated += g_ChunkSize;
+            });
         }
         else {
             LOG_ALLOCATOR("ERROR", "Pool[" << g_ChunkSize << "B]: Failed to return memory.");

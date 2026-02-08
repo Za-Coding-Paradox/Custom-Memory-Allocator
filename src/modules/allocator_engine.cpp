@@ -97,10 +97,10 @@ template <typename TScope> void AllocatorEngine::PrintStats(const char* ScopeNam
     };
 
     std::cout << "\n[" << ScopeName << "]\n"
-              << "  Allocated : " << FormatBytes(Snap.Allocated) << "\n"
-              << "  Current   : " << FormatBytes(Snap.Current) << "\n"
-              << "  Peak      : " << FormatBytes(Snap.Peak) << "\n"
-              << "  Count     : " << Snap.Count << "\n";
+              << "  Allocated : " << FormatBytes(Snap.BytesAllocated) << "\n"
+              << "  Current   : " << FormatBytes(Snap.BytesAllocated - Snap.BytesFreed) << "\n"
+              << "  Peak      : " << FormatBytes(Snap.PeakUsage) << "\n"
+              << "  Count     : " << Snap.AllocationCount << "\n";
 }
 
 void AllocatorEngine::GenerateFullReport() const noexcept

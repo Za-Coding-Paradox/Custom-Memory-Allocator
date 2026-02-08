@@ -1,4 +1,8 @@
 #pragma once
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <span>
 #include <utilities/allocator_utility.h>
 
 namespace Allocator {
@@ -28,10 +32,14 @@ private:
     size_t m_TotalSlots;
     size_t m_AvailableSlabMemory;
 
+    mutable std::mutex m_SlabMutex;
+
 public:
     SlabDescriptor(const SlabConfig& Config) noexcept;
 
     void ResetSlab() noexcept;
+
+    std::mutex& GetMutex() const noexcept { return m_SlabMutex; }
 
     inline void UpdateFreeListHead(uintptr_t FreeListHead) noexcept
     {
@@ -60,16 +68,17 @@ private:
     size_t m_DescriptorCount;
 
     std::unique_ptr<std::atomic<uint64_t>[]> m_BitMap;
-    std::atomic<size_t> m_SearchHint{0};
+    std::unique_ptr<std::atomic<uint64_t>[]> m_SuperBlock;
     size_t m_BitMapSizeInWords;
+    size_t m_SuperBlockSize;
+
+    std::atomic<size_t> m_SearchHint{0};
 
     void* m_ArenaRegistryStart;
     void* m_ArenaSlabsStart;
 
     size_t m_ArenaSize;
     size_t m_SlabSize;
-
-    std::mutex m_AllocationMutex;
 
     [[nodiscard]] bool InitializeArena() noexcept;
     void ShutdownArena() noexcept;
@@ -85,6 +94,8 @@ public:
 
     [[nodiscard]] SlabDescriptor* AllocateSlab() noexcept;
     void FreeSlab(SlabDescriptor* SlabToFree) noexcept;
+
+    [[nodiscard]] SlabDescriptor* GetSlabDescriptor(void* Ptr) const noexcept;
 
     [[nodiscard]] inline size_t GetSlabSize() const noexcept { return m_SlabSize; }
     [[nodiscard]] inline size_t GetArenaSize() const noexcept { return m_ArenaSize; }
