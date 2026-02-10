@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cassert>
@@ -11,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <list>
@@ -69,7 +71,7 @@ inline std::mutex g_LogMutex;
 #ifndef NDEBUG
 #define ALLOCATOR_DIAGNOSTIC(code) code
 #else
-#define ALLOCATOR_DIAGNOSTIC(code) code
+#define ALLOCATOR_DIAGNOSTIC(code) ((void)0)
 // write ((void)0) for maximum efficiency.
 // write code for optimal testing
 #endif
