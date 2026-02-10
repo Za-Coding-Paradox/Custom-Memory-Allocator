@@ -16,7 +16,7 @@ template <typename TContext> class PoolModule
 public:
     static constexpr size_t g_ChunkSize = TContext::g_BucketSize;
 
-    struct ThreadLocalData
+    struct alignas(64) ThreadLocalData
     {
         SlabDescriptor* ActiveSlab = nullptr;
         SlabDescriptor* HeadSlab = nullptr;
@@ -26,13 +26,15 @@ public:
         size_t BytesFreed = 0;
         size_t AllocCount = 0;
         size_t FreeCount = 0;
+
+        char Padding[64 - (sizeof(uint64_t) * 4 + sizeof(void*) * 3) % 64];
     };
 
 private:
-    static ThreadLocalData& GetTLS() noexcept
+    [[nodiscard]] static __attribute__((always_inline)) inline ThreadLocalData& GetTLS() noexcept
     {
-        static thread_local ThreadLocalData data;
-        return data;
+        static thread_local ThreadLocalData Context;
+        return Context;
     }
 
     static thread_local PoolModuleThreadGuard<TContext> g_ThreadGuard;
@@ -86,31 +88,52 @@ public:
         auto& tls = GetTLS();
         void* Result = nullptr;
 
-        if (tls.ActiveSlab && PoolStrategy::CanFit(*tls.ActiveSlab)) [[likely]] {
-            LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Allocating from Active Slab.");
-            Result = PoolStrategy::Allocate(*tls.ActiveSlab);
+        if (tls.ActiveSlab) [[likely]] {
+            std::lock_guard<std::mutex> Lock(tls.ActiveSlab->GetMutex());
+
+            if (PoolStrategy::CanFit(*tls.ActiveSlab)) {
+                LOG_ALLOCATOR("DEBUG",
+                              "Pool[" << g_ChunkSize << "B]: Allocating from Active Slab.");
+                Result = PoolStrategy::Allocate(*tls.ActiveSlab);
+            }
         }
-        else {
+
+        if (Result == nullptr) {
             LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Searching chain...");
+
             SlabDescriptor* Current = (tls.FirstNonFullSlab) ? tls.FirstNonFullSlab : tls.HeadSlab;
+
             while (Current) {
-                if (PoolStrategy::CanFit(*Current)) {
-                    tls.ActiveSlab = Current;
-                    tls.FirstNonFullSlab = Current;
-                    Result = PoolStrategy::Allocate(*tls.ActiveSlab);
-                    break;
+                {
+                    std::lock_guard<std::mutex> Lock(Current->GetMutex());
+
+                    if (PoolStrategy::CanFit(*Current)) {
+                        tls.ActiveSlab = Current;
+                        tls.FirstNonFullSlab = Current;
+
+                        Result = PoolStrategy::Allocate(*tls.ActiveSlab);
+
+                        goto AllocationSuccess;
+                    }
                 }
                 Current = Current->GetNextSlab();
             }
 
             if (!Result) {
                 LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Chain exhausted. Growing.");
+
                 GrowSlabChain();
-                if (tls.ActiveSlab)
-                    Result = PoolStrategy::Allocate(*tls.ActiveSlab);
+
+                if (tls.ActiveSlab) {
+                    std::lock_guard<std::mutex> Lock(tls.ActiveSlab->GetMutex());
+                    if (PoolStrategy::CanFit(*tls.ActiveSlab)) {
+                        Result = PoolStrategy::Allocate(*tls.ActiveSlab);
+                    }
+                }
             }
         }
 
+    AllocationSuccess:
         if (Result != nullptr) [[likely]] {
             ALLOCATOR_DIAGNOSTIC({
                 tls.AllocCount++;
@@ -135,7 +158,10 @@ public:
         SlabDescriptor* Slab = Registry->GetSlabDescriptor(MemoryToFree);
 
         if (Slab) [[likely]] {
-            PoolStrategy::Free(*Slab, MemoryToFree);
+            {
+                std::lock_guard<std::mutex> Lock(Slab->GetMutex());
+                PoolStrategy::Free(*Slab, MemoryToFree);
+            }
 
             ALLOCATOR_DIAGNOSTIC({
                 auto& tls = GetTLS();

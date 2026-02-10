@@ -47,7 +47,7 @@ public:
         return reinterpret_cast<void*>(AlignedDataStart);
     }
 
-    static inline void Free(SlabDescriptor&, void*) noexcept { /* No-Op by design */ }
+    static inline void Free(SlabDescriptor&, void*) noexcept { /* NO-OP */ }
 
     static void Reset(SlabDescriptor& SlabToReset) noexcept;
 

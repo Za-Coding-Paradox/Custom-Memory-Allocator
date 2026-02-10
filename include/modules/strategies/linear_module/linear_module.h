@@ -10,7 +10,7 @@ template <typename TContext> class LinearModuleThreadGuard;
 template <typename TContext> class LinearStrategyModule
 {
 public:
-    struct ThreadLocalData
+    struct alignas(64) ThreadLocalData
     {
         SlabDescriptor* HeadSlab = nullptr;
         SlabDescriptor* ActiveSlab = nullptr;
@@ -19,13 +19,15 @@ public:
         size_t ThreadFreed = 0;
         size_t ThreadCount = 0;
         size_t ThreadPeak = 0;
+
+        char Padding[64 - (sizeof(uint64_t) * 4 + sizeof(void*) * 3) % 64];
     };
 
 private:
-    static ThreadLocalData& GetTLS() noexcept
+    [[nodiscard]] static __attribute__((always_inline)) inline ThreadLocalData& GetTLS() noexcept
     {
-        static thread_local ThreadLocalData data;
-        return data;
+        static thread_local ThreadLocalData Context;
+        return Context;
     }
 
     static thread_local LinearModuleThreadGuard<TContext> g_ThreadGuard;

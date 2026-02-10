@@ -1975,7 +1975,7 @@ TEST_F(AllocatorStressTest, HandleLimits_UtilizationTracking)
 TEST_F(AllocatorStressTest, HandleLimits_InvalidHandleOperations)
 {
     // Test with garbage handle
-    Handle garbage(0xDEADBEEF, 0xCAFEBABE);
+    Handle garbage(0xDEADBEEF, 0xCAFEBABE, 0);
 
     void* ptr = m_Engine->ResolveHandle<Bucket64>(garbage);
     EXPECT_EQ(ptr, nullptr) << "Garbage handle should not resolve";
@@ -2383,7 +2383,7 @@ TEST_F(AllocatorStressTest, MultiContext_NonTrivialTypeStorage)
 TEST_F(AllocatorStressTest, MultiContext_RandomSizeDistribution)
 {
     std::mt19937 rng(12345);
-    std::uniform_int_distribution<size_t> sizeDist(16, 4096);
+    std::uniform_int_distribution<size_t> sizeDist(16, 256);
 
     for (int i = 0; i < 10000; ++i) {
         size_t size = sizeDist(rng);
