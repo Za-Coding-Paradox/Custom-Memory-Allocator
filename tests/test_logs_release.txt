@@ -11,17 +11,17 @@
 === REGISTRY THRASHING (50 THREADS) ===
 Success: 5000
 Fail: 0
-[       OK ] AllocatorStressTest.RegistryThrashing_50ThreadsSimultaneousSlabRequests (22 ms)
+[       OK ] AllocatorStressTest.RegistryThrashing_50ThreadsSimultaneousSlabRequests (21 ms)
 [ RUN      ] AllocatorStressTest.RegistryThrashing_BitMapExhaustion
 === BITMAP EXHAUSTION ===
 Allocated 2044 large blocks before OOM
-[       OK ] AllocatorStressTest.RegistryThrashing_BitMapExhaustion (17 ms)
+[       OK ] AllocatorStressTest.RegistryThrashing_BitMapExhaustion (16 ms)
 [ RUN      ] AllocatorStressTest.RegistryThrashing_SearchHintWrapAround
-[       OK ] AllocatorStressTest.RegistryThrashing_SearchHintWrapAround (14 ms)
+[       OK ] AllocatorStressTest.RegistryThrashing_SearchHintWrapAround (15 ms)
 [ RUN      ] AllocatorStressTest.RegistryThrashing_ConcurrentSlabFreeAndAlloc
 === CONCURRENT SLAB CYCLING ===
-Total cycles: 3894404
-[       OK ] AllocatorStressTest.RegistryThrashing_ConcurrentSlabFreeAndAlloc (117 ms)
+Total cycles: 4313777
+[       OK ] AllocatorStressTest.RegistryThrashing_ConcurrentSlabFreeAndAlloc (120 ms)
 [ RUN      ] AllocatorStressTest.RegistryThrashing_SlabAllocationRace
 === SLAB ALLOCATION RACE ===
 Total allocations: 1600
@@ -51,7 +51,7 @@ Freed: 10000
 === CROSS-THREAD FREE VALIDATION ===
 Threads: 16
 Objects per thread: 500
-[       OK ] AllocatorStressTest.CrossThread_GetSlabDescriptorValidation (16 ms)
+[       OK ] AllocatorStressTest.CrossThread_GetSlabDescriptorValidation (15 ms)
 [ RUN      ] AllocatorStressTest.CrossThread_PerSlabMutexContention
 === PER-SLAB MUTEX CONTENTION ===
 Successful allocs: 3200
@@ -59,9 +59,9 @@ Threads with contention: 0
 [       OK ] AllocatorStressTest.CrossThread_PerSlabMutexContention (16 ms)
 [ RUN      ] AllocatorStressTest.CrossThread_SimultaneousAllocateAndFree
 === SIMULTANEOUS ALLOC/FREE ===
-Allocations: 436291
-Frees: 404973
-[       OK ] AllocatorStressTest.CrossThread_SimultaneousAllocateAndFree (217 ms)
+Allocations: 440939
+Frees: 396853
+[       OK ] AllocatorStressTest.CrossThread_SimultaneousAllocateAndFree (218 ms)
 [ RUN      ] AllocatorStressTest.CrossThread_DataRaceDetection
 === DATA RACE DETECTION ===
 Races detected: 0
@@ -79,7 +79,7 @@ Visibility errors: 0
 [ RUN      ] AllocatorStressTest.CrossThread_StaleHandleAfterCrossThreadFree
 === STALE HANDLE DETECTION ===
 Stale accesses: 0
-[       OK ] AllocatorStressTest.CrossThread_StaleHandleAfterCrossThreadFree (110 ms)
+[       OK ] AllocatorStressTest.CrossThread_StaleHandleAfterCrossThreadFree (109 ms)
 [ RUN      ] AllocatorStressTest.CrossThread_AllocateFreeAllocateChurn
 === ALLOCATE/FREE CHURN ===
 Total cycles: 16000
@@ -97,29 +97,33 @@ Stale hint incidents: 0
 [       OK ] AllocatorStressTest.CrossThread_PoolFirstNonFullSlabInvalidation (15 ms)
 [ RUN      ] AllocatorStressTest.CacheThrashing_AtomicCounterHammering
 === CACHE LINE PADDING EFFECTIVENESS ===
-Padded time: 73 ms
-Unpadded time: 335 ms
-Speedup from padding: 4.58904x
-[       OK ] AllocatorStressTest.CacheThrashing_AtomicCounterHammering (423 ms)
+Padded time: 74 ms
+Unpadded time: 342 ms
+Speedup from padding: 4.62162x
+[       OK ] AllocatorStressTest.CacheThrashing_AtomicCounterHammering (431 ms)
 [ RUN      ] AllocatorStressTest.CacheThrashing_ContextStatsAlignment
 === CONTEXTSTATS ALIGNMENT ===
-stats1 address: 0x7ffd59ecc580
-stats2 address: 0x7ffd59ecc5c0
+stats1 address: 0x7ffcaf9bc900
+stats2 address: 0x7ffcaf9bc940
 Alignment: 0 bytes
 [       OK ] AllocatorStressTest.CacheThrashing_ContextStatsAlignment (14 ms)
 [ RUN      ] AllocatorStressTest.CacheThrashing_HandleTableAtomicSeparation
 === HANDLE TABLE CACHE EFFICIENCY ===
 Total operations: 3200000
-Time: 129 ms
-Ops/sec: 24806201
-[       OK ] AllocatorStressTest.CacheThrashing_HandleTableAtomicSeparation (144 ms)
+Time: 126 ms
+Ops/sec: 25396825
+[       OK ] AllocatorStressTest.CacheThrashing_HandleTableAtomicSeparation (140 ms)
 [ RUN      ] AllocatorStressTest.CacheThrashing_TLSBufferAccess
 === TLS BUFFER ACCESS VARIANCE ===
 Avg time: 88 µs
-Min time: 79 µs
-Max time: 98 µs
-Variance: 21.5909%
-[       OK ] AllocatorStressTest.CacheThrashing_TLSBufferAccess (14 ms)
+Min time: 76 µs
+Max time: 103 µs
+Variance: 30.6818%
+/home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/tests/tests.cpp:1214: Failure
+Expected: (variance) < (0.3f), actual: 0.306818187 vs 0.3
+High variance suggests false sharing
+
+[  FAILED  ] AllocatorStressTest.CacheThrashing_TLSBufferAccess (14 ms)
 [ RUN      ] AllocatorStressTest.CacheThrashing_SlabDescriptorMutexContention
 === SLAB MUTEX CONTENTION ===
 Threads with high contention: 0
@@ -157,15 +161,15 @@ Reallocated: 2500
 64B: 100000
 128B: 100000
 256B: 100000
-[       OK ] AllocatorStressTest.OOMRecovery_PoolExhaustionAllBuckets (60 ms)
+[       OK ] AllocatorStressTest.OOMRecovery_PoolExhaustionAllBuckets (59 ms)
 [ RUN      ] AllocatorStressTest.OOMRecovery_LinearSlabChainExhaustion
 === LINEAR SLAB CHAIN EXHAUSTION ===
 Slabs in chain: 1023
 [       OK ] AllocatorStressTest.OOMRecovery_LinearSlabChainExhaustion (13 ms)
 [ RUN      ] AllocatorStressTest.OOMRecovery_ConcurrentOOMHandling
 === CONCURRENT OOM HANDLING ===
-Successful allocations: 3436
-OOM events: 15
+Successful allocations: 4210
+OOM events: 14
 [       OK ] AllocatorStressTest.OOMRecovery_ConcurrentOOMHandling (14 ms)
 [ RUN      ] AllocatorStressTest.OOMRecovery_RepeatedOOMCycles
 === REPEATED OOM CYCLES ===
@@ -213,10 +217,10 @@ Stale detected: 10000
 [       OK ] AllocatorStressTest.HandleLimits_StaleHandleDetection (14 ms)
 [ RUN      ] AllocatorStressTest.HandleLimits_ConcurrentGrowthTo2Million
 === CONCURRENT GROWTH TO 2M ===
-Total allocated: 1765610
-Time: 76 ms
-Handles/sec: 23231710
-[       OK ] AllocatorStressTest.HandleLimits_ConcurrentGrowthTo2Million (170 ms)
+Total allocated: 1968433
+Time: 81 ms
+Handles/sec: 24301641
+[       OK ] AllocatorStressTest.HandleLimits_ConcurrentGrowthTo2Million (183 ms)
 [ RUN      ] AllocatorStressTest.HandleLimits_PageGrowthUnderPressure
 === PAGE GROWTH UNDER PRESSURE ===
 Allocated: 50000 handles
@@ -248,11 +252,11 @@ Pool handles: 1000
 [       OK ] AllocatorStressTest.MultiContext_ThreeContextsConcurrent (14 ms)
 [ RUN      ] AllocatorStressTest.MultiContext_ContextSwitchingOverhead
 === CONTEXT SWITCHING OVERHEAD ===
-Time per allocation: 5.6921 ns
+Time per allocation: 5.6665 ns
 [       OK ] AllocatorStressTest.MultiContext_ContextSwitchingOverhead (14 ms)
 [ RUN      ] AllocatorStressTest.MultiContext_AbsurdAlignment4096
 === ABSURD ALIGNMENT 4096 ===
-Address: 0x7f761abc6000
+Address: 0x7ff682fc6000
 Alignment: 0
 [       OK ] AllocatorStressTest.MultiContext_AbsurdAlignment4096 (13 ms)
 [ RUN      ] AllocatorStressTest.MultiContext_MixedAlignments
@@ -293,9 +297,9 @@ Expected: (ptr) != (nullptr), actual: NULL vs (nullptr)
 [  FAILED  ] AllocatorStressTest.MultiContext_RandomSizeDistribution (13 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_LinearVsMalloc
 === LINEAR VS MALLOC ===
-Custom: 28.9703 ns/alloc
-malloc: 104.854 ns/alloc
-Speedup: 3.61936x
+Custom: 28.9376 ns/alloc
+malloc: 106.355 ns/alloc
+Speedup: 3.67533x
 [       OK ] AllocatorStressTest.Benchmark_LinearVsMalloc (227 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_PoolVsMalloc
 === POOL VS MALLOC ===
@@ -306,31 +310,31 @@ Speedup: 0.75x
 Expected: (speedup) > (1.2), actual: 0.75 vs 1.2
 Pool should be competitive with malloc
 
-[  FAILED  ] AllocatorStressTest.Benchmark_PoolVsMalloc (29 ms)
+[  FAILED  ] AllocatorStressTest.Benchmark_PoolVsMalloc (30 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_ThroughputUnderLoad
 === THROUGHPUT UNDER LOAD ===
-Total allocations: 1144771
-Time: 29 ms
-Throughput: 39474862 allocs/sec
-[       OK ] AllocatorStressTest.Benchmark_ThroughputUnderLoad (43 ms)
+Total allocations: 1349743
+Time: 34 ms
+Throughput: 39698323 allocs/sec
+[       OK ] AllocatorStressTest.Benchmark_ThroughputUnderLoad (47 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_CacheEfficiency
 === CACHE EFFICIENCY ===
-Time per alloc+access: 5.95101 ns
+Time per alloc+access: 5.98616 ns
 [       OK ] AllocatorStressTest.Benchmark_CacheEfficiency (20 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_HandleResolutionSpeed
 === HANDLE RESOLUTION SPEED ===
 Resolutions: 10000000
-Time per resolve: 2.84354 ns
+Time per resolve: 2.84303 ns
 [       OK ] AllocatorStressTest.Benchmark_HandleResolutionSpeed (42 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_ResetPerformance
 === RESET PERFORMANCE ===
 Resets: 100000
-Time per reset: 61.7904 ns
+Time per reset: 60.671 ns
 [       OK ] AllocatorStressTest.Benchmark_ResetPerformance (19 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_PoolFreePerformance
 === POOL FREE PERFORMANCE ===
 Cycles: 100000
-Time per free+alloc: 76.2805 ns
+Time per free+alloc: 76.2171 ns
 [       OK ] AllocatorStressTest.Benchmark_PoolFreePerformance (21 ms)
 [ RUN      ] AllocatorStressTest.Benchmark_EndToEndGameSimulation
 === END-TO-END GAME SIMULATION ===
@@ -338,16 +342,17 @@ Frames: 10000
 Time: 8 ms
 FPS equivalent: 1250000
 [       OK ] AllocatorStressTest.Benchmark_EndToEndGameSimulation (22 ms)
-[----------] 68 tests from AllocatorStressTest (2584 ms total)
+[----------] 68 tests from AllocatorStressTest (2608 ms total)
 
 [----------] Global test environment tear-down
-[==========] 68 tests from 1 test suite ran. (2584 ms total)
-[  PASSED  ] 66 tests.
-[  FAILED  ] 2 tests, listed below:
+[==========] 68 tests from 1 test suite ran. (2608 ms total)
+[  PASSED  ] 65 tests.
+[  FAILED  ] 3 tests, listed below:
+[  FAILED  ] AllocatorStressTest.CacheThrashing_TLSBufferAccess
 [  FAILED  ] AllocatorStressTest.MultiContext_RandomSizeDistribution
 [  FAILED  ] AllocatorStressTest.Benchmark_PoolVsMalloc
 
- 2 FAILED TESTS
+ 3 FAILED TESTS
 
 ╔══════════════════════════════════════════════════════════════╗
 ║      TEST RUN COMPLETE                                       ║

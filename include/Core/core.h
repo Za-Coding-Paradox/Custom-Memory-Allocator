@@ -71,7 +71,7 @@ inline std::mutex g_LogMutex;
 #ifndef NDEBUG
 #define ALLOCATOR_DIAGNOSTIC(code) code
 #else
-#define ALLOCATOR_DIAGNOSTIC(code) code
+#define ALLOCATOR_DIAGNOSTIC(code) ((void)0)
 // write ((void)0) for maximum efficiency.
 // write code for optimal testing
 #endif
