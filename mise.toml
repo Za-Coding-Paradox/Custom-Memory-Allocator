@@ -1,0 +1,22 @@
+[tools]
+# Build Systems
+cmake = "latest"
+ninja = "latest"
+
+# Optional: Python (often needed for testing scripts/GDB extensions)
+python = "3.12"
+
+[env]
+# Force CMake to use the Ninja generator by default
+CMAKE_GENERATOR = "Ninja"
+
+# Set Clang as the default compiler for this project
+CC = "clang"
+CXX = "clang++"
+
+# Ensure compile commands are generated for your Neovim LSP (clangd)
+CMAKE_EXPORT_COMPILE_COMMANDS = "1"
+
+# mise hint use multiple versions simultaneously with mise use python@3.12 python@3.11
+# mise hint installing precompiled python from astral-sh/python-build-standalone
+# if you experience issues with this python (e.g.: running poetry), switch to python-build by running mise settings python.compile=1
