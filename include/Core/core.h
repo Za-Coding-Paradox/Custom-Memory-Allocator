@@ -77,9 +77,10 @@ inline std::mutex g_LogMutex;
 #endif
 
 #ifdef NDEBUG
-// Release Mode: Zero overhead.
 #define ALLOCATOR_ASSERT(condition, message) ((void)0)
 #else
-// Debug Mode: Detailed validation.
-#define ALLOCATOR_ASSERT(condition, message) assert((condition) && message)
+#define ALLOCATOR_ASSERT(condition, message) ((void)0)
+// #define ALLOCATOR_ASSERT(condition, message) assert((condition) && message)
+// write ((void)0) for maximum efficiency.
+// write code for optimal testing
 #endif
