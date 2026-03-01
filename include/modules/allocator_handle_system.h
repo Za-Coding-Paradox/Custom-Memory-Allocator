@@ -70,7 +70,7 @@ private:
 
     std::array<std::atomic<HandleMetadata*>, g_MaxPages> m_Pages;
 
-    alignas(64) std::atomic<uint32_t> m_FreeListHead;
+    alignas(64) std::atomic<uint64_t> m_TaggedHead;
     alignas(64) std::atomic<uint32_t> m_ActiveCount;
     alignas(64) std::atomic<uint32_t> m_Capacity;
 
@@ -84,6 +84,19 @@ private:
     };
 
     bool GrowCapacity() noexcept;
+
+    static constexpr uint64_t PackHead(uint32_t Index, uint32_t Tag) noexcept
+    {
+        return (static_cast<uint64_t>(Tag) << 32) | static_cast<uint64_t>(Index);
+    }
+    static constexpr uint32_t HeadIndex(uint64_t Packed) noexcept
+    {
+        return static_cast<uint32_t>(Packed);
+    }
+    static constexpr uint32_t HeadTag(uint64_t Packed) noexcept
+    {
+        return static_cast<uint32_t>(Packed >> 32);
+    }
 
 public:
     explicit HandleTableShard() noexcept;

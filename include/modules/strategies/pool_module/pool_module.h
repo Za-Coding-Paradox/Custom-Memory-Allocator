@@ -62,23 +62,28 @@ public:
     {
         ALLOCATOR_DIAGNOSTIC({
             auto& tls = GetTLS();
-            if (tls.BytesAllocated > 0 || tls.BytesFreed > 0 || tls.AllocCount > 0 ||
-                tls.FreeCount > 0) {
-                if (tls.BytesAllocated > 0)
-                    g_Stats.BytesAllocated.fetch_add(tls.BytesAllocated, std::memory_order_relaxed);
-                if (tls.BytesFreed > 0)
-                    g_Stats.BytesFreed.fetch_add(tls.BytesFreed, std::memory_order_relaxed);
-                if (tls.AllocCount > 0)
-                    g_Stats.AllocationCount.fetch_add(tls.AllocCount, std::memory_order_relaxed);
-                if (tls.FreeCount > 0)
-                    g_Stats.AllocationCount.fetch_sub(tls.FreeCount, std::memory_order_relaxed);
 
-                tls.BytesAllocated = 0;
-                tls.BytesFreed = 0;
-                tls.AllocCount = 0;
-                tls.FreeCount = 0;
-                UpdatePeakUsage();
-            }
+            const bool HasAllocStats = (tls.BytesAllocated > 0 || tls.AllocCount > 0);
+            const bool HasFreeStats = (tls.BytesFreed > 0 || tls.FreeCount > 0);
+
+            if (!HasAllocStats && !HasFreeStats)
+                return;
+
+            if (tls.BytesAllocated > 0)
+                g_Stats.BytesAllocated.fetch_add(tls.BytesAllocated, std::memory_order_relaxed);
+
+            if (tls.BytesFreed > 0)
+                g_Stats.BytesFreed.fetch_add(tls.BytesFreed, std::memory_order_relaxed);
+
+            if (tls.AllocCount > 0)
+                g_Stats.AllocationCount.fetch_add(tls.AllocCount, std::memory_order_relaxed);
+
+            tls.BytesAllocated = 0;
+            tls.BytesFreed = 0;
+            tls.AllocCount = 0;
+            tls.FreeCount = 0;
+
+            UpdatePeakUsage();
         });
     }
 
