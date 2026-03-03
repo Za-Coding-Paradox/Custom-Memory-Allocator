@@ -1195,7 +1195,7 @@ TEST_F(AllocatorStressTest, CacheThrashing_TLSBufferAccess)
     // How many slabs does each thread need? +1 for partial last slab.
     constexpr size_t g_SlabsNeeded = (g_AllocsPerThread / g_SlabCapacity) + 1; // 20
 
-    constexpr float g_VarianceLimit = 0.35f;
+    constexpr float g_VarianceLimit = 0.3f;
     constexpr size_t g_WarmupContendedThresholdUs = 500; // only warn above this absolute value
 
     struct alignas(64) ThreadResult
@@ -2513,14 +2513,206 @@ TEST_F(AllocatorStressTest, MultiContext_NonTrivialTypeStorage)
 
 TEST_F(AllocatorStressTest, MultiContext_RandomSizeDistribution)
 {
+    // =========================================================================
+    //  WHY THIS TEST HAS BEEN FAILING FOR TWO MONTHS
+    //  ───────────────────────────────────────────────────────────────────────
+    //  Root cause: LinearStrategyModule::ShutdownSystem() only nulls
+    //  tls.HeadSlab (via *HeadPtr = nullptr).  tls.ActiveSlab is never
+    //  touched.  After TearDown() destroys the engine (munmap kills the arena),
+    //  SetUp() creates a new engine — but the main test thread's TLS still has
+    //  tls.ActiveSlab pointing into the UNMAPPED arena.
+    //
+    //  Allocate() checks "if (tls.ActiveSlab == nullptr)" — it's not null,
+    //  it's a dangling pointer — so GrowSlabChain() is skipped entirely and
+    //  CanFit(*tls.ActiveSlab, ...) reads freed memory.  mmap sometimes
+    //  returns the same virtual address range on the next engine construction,
+    //  making the stale pointer accidentally valid — this is why the test
+    //  passes intermittently rather than crashing every time.
+    //
+    //  INSTRUMENTATION CHECKPOINTS:
+    //    [CP-1] Slab state at test entry — detects dangling ActiveSlab
+    //    [CP-2] First allocation — first observable failure point
+    //    [CP-3] Slab boundary crossings — detects overflow / growth failures
+    //    [CP-4] Alignment violations — ptr % alignment != 0
+    //    [CP-5] Contiguous write — detects if returned ptr overlaps prev alloc
+    //    [CP-6] Size bucket analysis — which size range triggers failure
+    //    [CP-7] Arena exhaustion check — OOM vs corruption
+    // =========================================================================
+
     std::mt19937 rng(12345);
     std::uniform_int_distribution<size_t> sizeDist(16, 256);
 
-    for (int i = 0; i < 10000; ++i) {
-        size_t size = sizeDist(rng);
-        void* ptr = m_Engine->Allocate<FrameLoad>(size);
-        EXPECT_NE(ptr, nullptr);
+    constexpr size_t g_Iterations = 10000;
+    constexpr size_t g_Alignment = 16;             // g_LinearStrategyAlignment
+    constexpr size_t g_SlabSize = g_ConstSlabSize; // 65536
+    constexpr size_t g_BucketWidth = 16;           // log size buckets for failure analysis
+
+    // ── [CP-1] Slab state at test entry ──────────────────────────────────────
+    // If HeadSlab==null but ActiveSlab!=null we have the stale-pointer bug.
+    // We can't inspect TLS directly from the test, so we use a canary alloc
+    // that forces GrowSlabChain if TLS is clean, or hits the stale path if not.
+    {
+        void* canary = m_Engine->Allocate<FrameLoad>(16);
+        std::cout << "\n[CP-1] Slab State at Entry\n"
+                  << "  Canary alloc (16B): "
+                  << (canary ? "OK" : "FAILED — stale ActiveSlab or OOM at entry") << "\n";
+        if (!canary) {
+            FAIL() << "[CP-1] FATAL: First allocation in fresh test returned nullptr.\n"
+                   << "This means tls.ActiveSlab is a dangling pointer from the previous\n"
+                   << "test's engine (ShutdownSystem nulled HeadSlab but not ActiveSlab).\n"
+                   << "Fix: store ThreadLocalData* in g_ThreadHeads so ShutdownSystem\n"
+                   << "can null both HeadSlab and ActiveSlab.";
+        }
+        if (reinterpret_cast<uintptr_t>(canary) % g_Alignment != 0) {
+            FAIL() << "[CP-1] FATAL: Canary ptr " << canary
+                   << " is misaligned (alignment=" << g_Alignment
+                   << "). Slab state is corrupt at entry.";
+        }
+        m_Engine->Reset<FrameLoad>(); // reset canary so iteration counts are clean
     }
+
+    // ── Tracking state ────────────────────────────────────────────────────────
+    size_t failCount = 0;
+    size_t firstFailIter = SIZE_MAX;
+    size_t firstFailSize = 0;
+    size_t slabCrossings = 0;
+    size_t alignViolations = 0;
+    size_t overlapViolations = 0;
+    size_t bytesAllocated = 0;
+
+    // Size bucket failure counters: [0]=16-31B, [1]=32-47B, ... [15]=240-256B
+    std::array<size_t, 16> bucketAttempts{};
+    std::array<size_t, 16> bucketFailures{};
+
+    void* prevPtr = nullptr;
+    size_t prevSize = 0;
+    uintptr_t lastSlabBoundary = 0;
+
+    for (size_t i = 0; i < g_Iterations; ++i) {
+        const size_t size = sizeDist(rng);
+        const size_t bucketIdx = std::min((size - 16) / g_BucketWidth, bucketAttempts.size() - 1);
+        bucketAttempts[bucketIdx]++;
+
+        void* ptr = m_Engine->Allocate<FrameLoad>(size);
+
+        // ── [CP-2] Null return ────────────────────────────────────────────────
+        if (ptr == nullptr) {
+            failCount++;
+            bucketFailures[bucketIdx]++;
+            if (firstFailIter == SIZE_MAX) {
+                firstFailIter = i;
+                firstFailSize = size;
+
+                // [CP-7] Check if this looks like OOM vs stale-pointer corruption.
+                // At average 136B/alloc + 15B alignment waste, we need roughly
+                // 10000 * 151 / 65536 = ~23 slabs. 64MB arena holds ~1024 slabs.
+                // If we fail before slab #3, it's almost certainly the stale-ptr bug.
+                const size_t approxSlabsUsed = bytesAllocated / g_SlabSize;
+                std::cout << "\n[CP-2/7] First nullptr at iteration " << i << ", size=" << size
+                          << "B\n"
+                          << "  Bytes allocated so far : " << bytesAllocated << "\n"
+                          << "  Approx slabs consumed   : " << approxSlabsUsed << "\n"
+                          << "  Slab crossings so far   : " << slabCrossings << "\n";
+
+                if (approxSlabsUsed == 0)
+                    std::cout
+                        << "  >> DIAGNOSIS: Failed on first slab with near-zero bytes used.\n"
+                        << "     Almost certainly the stale ActiveSlab bug.\n"
+                        << "     tls.ActiveSlab points into previous engine's unmapped arena.\n"
+                        << "     ShutdownSystem must null ActiveSlab, not just HeadSlab.\n";
+                else if (approxSlabsUsed < 5)
+                    std::cout << "  >> DIAGNOSIS: Failed very early (" << approxSlabsUsed
+                              << " slabs). Likely stale-pointer or GrowSlabChain failure.\n";
+                else
+                    std::cout << "  >> DIAGNOSIS: Failed after " << approxSlabsUsed
+                              << " slabs. Possible arena exhaustion from previous tests.\n"
+                              << "     Check if previous tests are not returning slabs properly.\n";
+            }
+            EXPECT_NE(ptr, nullptr)
+                << "Iteration " << i << " size=" << size << "B returned nullptr.\n"
+                << "First failure: iter=" << firstFailIter << " size=" << firstFailSize << "B\n"
+                << "See CP-2/7 output above for diagnosis.";
+            continue; // keep going to gather full failure distribution
+        }
+
+        const uintptr_t ptrVal = reinterpret_cast<uintptr_t>(ptr);
+
+        // ── [CP-4] Alignment check ────────────────────────────────────────────
+        if (ptrVal % g_Alignment != 0) {
+            alignViolations++;
+            if (alignViolations <= 3)
+                std::cout << "\n[CP-4] ALIGNMENT VIOLATION at iter " << i << ": ptr=" << ptr
+                          << " size=" << size << "B, ptr%" << g_Alignment << "="
+                          << (ptrVal % g_Alignment) << "\n"
+                          << "  This means LinearStrategy::Allocate is not calling AlignForward,\n"
+                          << "  or AlignForward has a bug.\n";
+            EXPECT_EQ(ptrVal % g_Alignment, 0u)
+                << "Misaligned ptr at iter " << i << " size=" << size;
+        }
+
+        // ── [CP-5] Overlap check (consecutive allocs must not overlap) ────────
+        if (prevPtr != nullptr) {
+            const uintptr_t prevEnd = reinterpret_cast<uintptr_t>(prevPtr) + prevSize;
+            if (ptrVal < prevEnd && ptrVal >= reinterpret_cast<uintptr_t>(prevPtr)) {
+                overlapViolations++;
+                if (overlapViolations <= 3)
+                    std::cout << "\n[CP-5] OVERLAP at iter " << i << ": prev=[" << prevPtr << "+"
+                              << prevSize << "] new=" << ptr << " size=" << size << "\n"
+                              << "  The bump pointer did not advance far enough after the\n"
+                              << "  previous allocation. Possible size=0 or alignment bug.\n";
+                EXPECT_GE(ptrVal, prevEnd)
+                    << "Allocation at iter " << i << " overlaps previous allocation.";
+            }
+        }
+
+        // ── [CP-3] Slab boundary tracking ────────────────────────────────────
+        // The bump pointer lives within one slab until overflow triggers
+        // GrowSlabChain. We detect crossings by watching for ptr jumps > 1 slab.
+        if (prevPtr != nullptr) {
+            const uintptr_t prevVal = reinterpret_cast<uintptr_t>(prevPtr);
+            if (ptrVal < prevVal || (ptrVal - prevVal) > g_SlabSize) {
+                slabCrossings++;
+                if (slabCrossings <= 5)
+                    std::cout << "[CP-3] Slab crossing at iter " << i << ": prev=0x" << std::hex
+                              << prevVal << " new=0x" << ptrVal << std::dec << " (+"
+                              << (ptrVal > prevVal ? ptrVal - prevVal : 0) << " bytes jump)\n";
+            }
+        }
+
+        prevPtr = ptr;
+        prevSize = size;
+        bytesAllocated += size;
+    }
+
+    // ── [CP-6] Size bucket failure analysis ───────────────────────────────────
+    bool anyBucketFailed = false;
+    for (size_t b = 0; b < bucketAttempts.size(); ++b) {
+        if (bucketFailures[b] > 0) {
+            anyBucketFailed = true;
+            const size_t lo = 16 + b * g_BucketWidth;
+            const size_t hi = lo + g_BucketWidth - 1;
+            std::cout << "[CP-6] Bucket [" << lo << "-" << hi << "B]: " << bucketFailures[b] << "/"
+                      << bucketAttempts[b] << " failed\n";
+        }
+    }
+
+    // ── Final summary ─────────────────────────────────────────────────────────
+    std::cout << "\n=== MultiContext_RandomSizeDistribution SUMMARY ===\n"
+              << "  Iterations       : " << g_Iterations << "\n"
+              << "  Failed allocs    : " << failCount << "\n"
+              << "  Align violations : " << alignViolations << "\n"
+              << "  Overlap errors   : " << overlapViolations << "\n"
+              << "  Slab crossings   : " << slabCrossings << "\n"
+              << "  Bytes allocated  : " << bytesAllocated << "\n"
+              << "  Approx slabs used: " << (bytesAllocated / g_SlabSize) << "\n";
+
+    if (failCount == 0 && alignViolations == 0 && overlapViolations == 0)
+        std::cout << "  >> PASS — all checkpoints clean.\n";
+    else
+        std::cout << "  >> FAIL — see checkpoint output above for root cause.\n";
+
+    if (!anyBucketFailed && failCount == 0)
+        std::cout << "  >> No size-specific failure pattern detected.\n";
 
     m_Engine->Reset<FrameLoad>();
 }
