@@ -3,11 +3,11 @@
 namespace Allocator {
 
 HandleTableShard::HandleTableShard() noexcept
-    : m_FreeListHead(g_FreeListEnd), m_ActiveCount(0), m_Capacity(0)
+    : m_TaggedHead(PackHead(g_FreeListEnd, 0)), m_ActiveCount(0), m_Capacity(0)
 {
-    for (auto& Page : m_Pages) {
+    for (auto& Page : m_Pages)
         Page.store(nullptr, std::memory_order_relaxed);
-    }
+
     GrowCapacity();
 }
 
@@ -15,23 +15,20 @@ HandleTableShard::~HandleTableShard() noexcept
 {
     for (auto& PageAtom : m_Pages) {
         HandleMetadata* Page = PageAtom.load(std::memory_order_relaxed);
-        if (Page) {
+        if (Page)
             delete[] Page;
-        }
     }
-}
-
-HandleTableShard::HandleTableShard() noexcept
-    : m_TaggedHead(PackHead(g_FreeListEnd, 0)), m_ActiveCount(0), m_Capacity(0)
-{
-    for (auto& Page : m_Pages)
-        Page.store(nullptr, std::memory_order_relaxed);
-    GrowCapacity();
 }
 
 bool HandleTableShard::GrowCapacity() noexcept
 {
     std::lock_guard<std::mutex> Lock(m_GrowthMutex);
+
+    {
+        const uint64_t Tagged = m_TaggedHead.load(std::memory_order_acquire);
+        if (HeadIndex(Tagged) != g_FreeListEnd)
+            return true;
+    }
 
     const uint32_t CurrentCap = m_Capacity.load(std::memory_order_relaxed);
     const uint32_t NextPageIndex = CurrentCap >> g_PageShift;
@@ -47,13 +44,13 @@ bool HandleTableShard::GrowCapacity() noexcept
 
     for (uint32_t i = 0; i < g_ElementsPerPage - 1; ++i) {
         NewPage[i].NextFree = BaseIndex + i + 1;
-        NewPage[i].Generation = 1;
+        NewPage[i].Generation.store(1, std::memory_order_relaxed);
     }
 
     uint64_t OldTagged = m_TaggedHead.load(std::memory_order_relaxed);
     while (true) {
         NewPage[g_ElementsPerPage - 1].NextFree = HeadIndex(OldTagged);
-        NewPage[g_ElementsPerPage - 1].Generation = 1;
+        NewPage[g_ElementsPerPage - 1].Generation.store(1, std::memory_order_relaxed);
 
         const uint64_t NewTagged = PackHead(BaseIndex, HeadTag(OldTagged) + 1);
 
@@ -88,17 +85,47 @@ HandleTableShard::ShardAllocResult HandleTableShard::AllocateRaw(void* Pointer) 
             return {0, 0, false};
 
         const uint32_t NextFree = Page[SlotIndex].NextFree;
-
         const uint64_t NewTagged = PackHead(NextFree, CurrentTag + 1);
 
         if (m_TaggedHead.compare_exchange_weak(CurrentTagged, NewTagged, std::memory_order_acq_rel,
                                                std::memory_order_acquire)) {
             HandleMetadata& Meta = Page[SlotIndex];
-            Meta.Pointer = Pointer;
+
+            const uint32_t Gen = Meta.Generation.load(std::memory_order_relaxed);
+
+            Meta.Pointer.store(Pointer, std::memory_order_release);
+
             m_ActiveCount.fetch_add(1, std::memory_order_relaxed);
-            return {CurrentIndex, Meta.Generation, true};
+            return {CurrentIndex, Gen, true};
         }
     }
+}
+
+void* HandleTableShard::ResolveRaw(uint32_t Index, uint32_t Generation) const noexcept
+{
+    const uint32_t PageIndex = Index >> g_PageShift;
+    const uint32_t SlotIndex = Index & g_PageMask;
+
+    if (PageIndex >= g_MaxPages)
+        return nullptr;
+
+    HandleMetadata* Page = m_Pages[PageIndex].load(std::memory_order_acquire);
+    if (!Page)
+        return nullptr;
+
+    const HandleMetadata& Meta = Page[SlotIndex];
+
+    const uint32_t Gen1 = Meta.Generation.load(std::memory_order_acquire);
+    if (Gen1 != Generation)
+        return nullptr;
+
+    void* Ptr = Meta.Pointer.load(std::memory_order_acquire);
+
+    const uint32_t Gen2 = Meta.Generation.load(std::memory_order_acquire);
+    if (Gen2 != Gen1)
+        return nullptr;
+
+    return Ptr;
 }
 
 bool HandleTableShard::FreeRaw(uint32_t Index, uint32_t Generation) noexcept
@@ -115,13 +142,13 @@ bool HandleTableShard::FreeRaw(uint32_t Index, uint32_t Generation) noexcept
 
     HandleMetadata& Meta = Page[SlotIndex];
 
-    if (Meta.Generation != Generation)
+    if (Meta.Generation.load(std::memory_order_acquire) != Generation)
         return false;
 
-    Meta.Pointer = nullptr;
+    Meta.Pointer.store(nullptr, std::memory_order_relaxed);
 
-    uint32_t NextGen = Meta.Generation + 1;
-    Meta.Generation = (NextGen == 0) ? 1 : NextGen;
+    const uint32_t NextGen = Meta.Generation.load(std::memory_order_relaxed) + 1;
+    Meta.Generation.store((NextGen == 0) ? 1 : NextGen, std::memory_order_release);
 
     uint64_t CurrentTagged = m_TaggedHead.load(std::memory_order_relaxed);
     uint64_t NewTagged;
@@ -148,16 +175,19 @@ void HandleTableShard::ClearRaw() noexcept
         const uint32_t BaseIndex = p << g_PageShift;
 
         for (uint32_t i = 0; i < g_ElementsPerPage - 1; ++i) {
-            Page[i].Pointer = nullptr;
-            if (++Page[i].Generation == 0)
-                Page[i].Generation = 1;
+            Page[i].Pointer.store(nullptr, std::memory_order_relaxed);
+
+            uint32_t NewGen = Page[i].Generation.load(std::memory_order_relaxed) + 1;
+            Page[i].Generation.store((NewGen == 0) ? 1 : NewGen, std::memory_order_relaxed);
+
             Page[i].NextFree = BaseIndex + i + 1;
         }
 
         HandleMetadata& LastSlot = Page[g_ElementsPerPage - 1];
-        LastSlot.Pointer = nullptr;
-        if (++LastSlot.Generation == 0)
-            LastSlot.Generation = 1;
+        LastSlot.Pointer.store(nullptr, std::memory_order_relaxed);
+
+        uint32_t LastGen = LastSlot.Generation.load(std::memory_order_relaxed) + 1;
+        LastSlot.Generation.store((LastGen == 0) ? 1 : LastGen, std::memory_order_relaxed);
 
         LastSlot.NextFree = (p < ActivePages - 1) ? ((p + 1) << g_PageShift) : g_FreeListEnd;
     }
@@ -168,7 +198,7 @@ void HandleTableShard::ClearRaw() noexcept
     m_ActiveCount.store(0, std::memory_order_relaxed);
 }
 
-HandleTable::HandleTable(uint32_t) noexcept {}
+HandleTable::HandleTable(uint32_t /*InitialCapacity*/) noexcept {}
 
 Handle HandleTable::Allocate(void* Pointer) noexcept
 {
@@ -176,11 +206,10 @@ Handle HandleTable::Allocate(void* Pointer) noexcept
         return g_InvalidHandle;
 
     const size_t ShardID = GetShardIndex();
-    auto Result = m_Shards[ShardID].AllocateRaw(Pointer);
+    const auto Result = m_Shards[ShardID].AllocateRaw(Pointer);
 
-    if (Result.Success) {
+    if (Result.Success)
         return Handle(Result.Index, Result.Generation, static_cast<uint8_t>(ShardID));
-    }
 
     return g_InvalidHandle;
 }
@@ -189,6 +218,7 @@ void* HandleTable::Resolve(Handle H) const noexcept
 {
     if (!H.IsValid())
         return nullptr;
+
     return m_Shards[H.GetShardID()].ResolveRaw(H.GetIndex(), H.GetGeneration());
 }
 
@@ -196,28 +226,30 @@ bool HandleTable::Free(Handle H) noexcept
 {
     if (!H.IsValid())
         return false;
+
     return m_Shards[H.GetShardID()].FreeRaw(H.GetIndex(), H.GetGeneration());
 }
 
 void HandleTable::Clear() noexcept
 {
-    for (auto& Shard : m_Shards) {
+    for (auto& Shard : m_Shards)
         Shard.ClearRaw();
-    }
 }
 
 uint32_t HandleTable::GetActiveCount() const noexcept
 {
     uint32_t Total = 0;
-    for (const auto& Shard : m_Shards) {
+    for (const auto& Shard : m_Shards)
         Total += Shard.GetActiveCount();
-    }
     return Total;
 }
 
 uint32_t HandleTable::GetCapacity() const noexcept
 {
-    return 0;
+    uint32_t Total = 0;
+    for (const auto& Shard : m_Shards)
+        Total += Shard.GetCapacity();
+    return Total;
 }
 
 } // namespace Allocator
