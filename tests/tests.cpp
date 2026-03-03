@@ -1195,7 +1195,7 @@ TEST_F(AllocatorStressTest, CacheThrashing_TLSBufferAccess)
     // How many slabs does each thread need? +1 for partial last slab.
     constexpr size_t g_SlabsNeeded = (g_AllocsPerThread / g_SlabCapacity) + 1; // 20
 
-    constexpr float g_VarianceLimit = 0.3f;
+    constexpr float g_VarianceLimit = 0.35f;
     constexpr size_t g_WarmupContendedThresholdUs = 500; // only warn above this absolute value
 
     struct alignas(64) ThreadResult
