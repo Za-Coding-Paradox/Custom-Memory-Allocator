@@ -22,17 +22,14 @@ SlabRegistry::SlabRegistry(size_t SlabSize, size_t RequestedArenaSize) noexcept
       m_SlabSize(SlabSize)
 {
     LOG_ALLOCATOR("INFO", "SlabRegistry: Initializing Arena. Size: " << m_ArenaSize);
-    if (!InitializeArena()) [[unlikely]] {
+    if (!InitializeArena()) [[unlikely]]
         LOG_ALLOCATOR("CRITICAL", "SlabRegistry: Arena Initialization Failed!");
-    }
 }
 
 SlabRegistry::~SlabRegistry() noexcept
 {
     ShutdownArena();
 }
-
-// allocator_registry.cpp
 
 bool SlabRegistry::InitializeArena() noexcept
 {
@@ -78,7 +75,6 @@ bool SlabRegistry::InitializeArena() noexcept
         return SlabEnd <= ArenaEnd;
     };
 
-    // Conservative upper bound
     size_t N = m_ArenaSize / (sizeof(SlabDescriptor) + m_SlabSize);
 
     if (N == 0) {
@@ -88,7 +84,6 @@ bool SlabRegistry::InitializeArena() noexcept
         return false;
     }
 
-    // Trim until actual layout fits — in practice this loops 0 or 1 times
     while (N > 0 && !FitsInArena(N))
         --N;
 
@@ -100,8 +95,6 @@ bool SlabRegistry::InitializeArena() noexcept
     }
 
     m_DescriptorCount = N;
-
-    std::memset(m_ArenaRegistryStart, 0, m_ArenaSize);
 
     m_BitMapSizeInWords = (m_DescriptorCount + 63) / 64;
     m_BitMap = std::make_unique<std::atomic<uint64_t>[]>(m_BitMapSizeInWords);
@@ -117,21 +110,19 @@ bool SlabRegistry::InitializeArena() noexcept
     const uintptr_t SlabRegionStart = ComputeSlabRegionStart(m_DescriptorCount);
     m_ArenaSlabsStart = reinterpret_cast<void*>(SlabRegionStart);
 
-    LOG_ALLOCATOR("DEBUG",
-                  "SlabRegistry: N="
-                      << m_DescriptorCount << " DescRegion=[0x" << std::hex << ArenaBase << "..0x"
-                      << (ArenaBase + m_DescriptorCount * sizeof(SlabDescriptor)) << "]"
-                      << " SlabRegion=[0x" << SlabRegionStart << "..0x"
-                      << (SlabRegionStart + m_DescriptorCount * m_SlabSize) << "]" << std::dec);
+    LOG_ALLOCATOR("DEBUG", "SlabRegistry: N="
+                               << m_DescriptorCount << " DescRegion=[0x" << std::hex << ArenaBase
+                               << "..0x" << (ArenaBase + m_DescriptorCount * sizeof(SlabDescriptor))
+                               << "] SlabRegion=[0x" << SlabRegionStart << "..0x"
+                               << (SlabRegionStart + m_DescriptorCount * m_SlabSize) << "]"
+                               << std::dec);
 
     uint8_t* CurrentSlabPtr = static_cast<uint8_t*>(m_ArenaSlabsStart);
-
     for (size_t i = 0; i < m_DescriptorCount; ++i) {
         SlabConfig Config{.p_StartAddress = reinterpret_cast<uintptr_t>(CurrentSlabPtr),
                           .p_FreeListHead = reinterpret_cast<uintptr_t>(CurrentSlabPtr),
                           .p_TotalSlots = 0,
                           .p_SlabMemory = m_SlabSize};
-
         new (&DescriptorBase[i]) SlabDescriptor(Config);
         CurrentSlabPtr += m_SlabSize;
     }
@@ -143,68 +134,99 @@ bool SlabRegistry::InitializeArena() noexcept
 
 SlabDescriptor* SlabRegistry::AllocateSlab() noexcept
 {
-    for (size_t sbIdx = 0; sbIdx < m_SuperBlockSize; ++sbIdx) {
-        uint64_t SuperWord = m_SuperBlock[sbIdx].load(std::memory_order_relaxed);
-        if (SuperWord == g_FullBlock)
+    SlabDescriptor* Out = nullptr;
+    const size_t Got = AllocateSlabBatch(1, &Out);
+    return (Got == 1) ? Out : nullptr;
+}
+
+size_t SlabRegistry::AllocateSlabBatch(size_t RequestCount, SlabDescriptor** OutSlabs) noexcept
+{
+    if (RequestCount == 0 || !OutSlabs)
+        return 0;
+
+    size_t Acquired = 0;
+
+    for (size_t SbIdx = 0; SbIdx < m_SuperBlockSize && Acquired < RequestCount; ++SbIdx) {
+        if (m_SuperBlock[SbIdx].load(std::memory_order_relaxed) == g_FullBlock)
             continue;
 
-        const size_t BaseWordIdx = sbIdx * g_BitsPerBlock;
+        const size_t BaseWordIdx = SbIdx * g_BitsPerBlock;
 
-        for (size_t i = 0; i < g_BitsPerBlock; ++i) {
-            const size_t WordIdx = BaseWordIdx + i;
+        for (size_t WordOff = 0; WordOff < g_BitsPerBlock && Acquired < RequestCount; ++WordOff) {
+            const size_t WordIdx = BaseWordIdx + WordOff;
             if (WordIdx >= m_BitMapSizeInWords)
                 break;
 
             uint64_t Word = m_BitMap[WordIdx].load(std::memory_order_relaxed);
-
             if (Word == g_FullBlock)
                 continue;
 
-            while (Word != g_FullBlock) {
-                const int BitIdx = std::countr_one(Word);
-                if (BitIdx >= 64)
+            while (Word != g_FullBlock && Acquired < RequestCount) {
+                const size_t Want = RequestCount - Acquired;
+
+                uint64_t ClaimMask = 0;
+                uint64_t Scratch = Word;
+                size_t CanClaim = 0;
+
+                while (CanClaim < Want) {
+                    const int Bit = std::countr_one(Scratch);
+                    if (Bit >= 64)
+                        break;
+                    ClaimMask |= (1ULL << Bit);
+                    Scratch |= (1ULL << Bit);
+                    ++CanClaim;
+                }
+
+                if (CanClaim == 0)
                     break;
 
-                const uint64_t Mask = 1ULL << static_cast<uint64_t>(BitIdx);
-                const uint64_t NewWord = Word | Mask;
+                const uint64_t NewWord = Word | ClaimMask;
 
                 if (m_BitMap[WordIdx].compare_exchange_weak(
                         Word, NewWord, std::memory_order_acquire, std::memory_order_relaxed)) {
-                    const size_t GlobalIdx = (WordIdx << 6) | static_cast<size_t>(BitIdx);
+                    uint64_t Remaining = ClaimMask;
+                    while (Remaining) {
+                        const int Bit = std::countr_zero(Remaining);
+                        Remaining &= Remaining - 1;
 
-                    if (GlobalIdx >= m_DescriptorCount) [[unlikely]] {
-                        m_BitMap[WordIdx].fetch_and(~Mask, std::memory_order_release);
-                        LOG_ALLOCATOR("ERROR", "SlabRegistry: Claimed bit "
-                                                   << GlobalIdx << " exceeds descriptor count "
-                                                   << m_DescriptorCount);
-                        return nullptr;
+                        const size_t GlobalIdx = (WordIdx << 6) | static_cast<size_t>(Bit);
+
+                        if (GlobalIdx >= m_DescriptorCount) [[unlikely]] {
+                            m_BitMap[WordIdx].fetch_and(~(1ULL << Bit), std::memory_order_release);
+                            LOG_ALLOCATOR("ERROR", "SlabRegistry: Batch claimed bit "
+                                                       << GlobalIdx << " beyond descriptor count "
+                                                       << m_DescriptorCount << " — released.");
+                            continue;
+                        }
+
+                        SlabDescriptor* Slab = &m_DescriptorSpan[GlobalIdx];
+                        Slab->ResetSlab();
+                        OutSlabs[Acquired++] = Slab;
+
+                        LOG_ALLOCATOR("DEBUG", "SlabRegistry: Batch acquired Slab["
+                                                   << GlobalIdx << "] Word[" << WordIdx << "] Bit["
+                                                   << Bit << "]");
                     }
 
-                    if (NewWord == g_FullBlock) {
-                        m_SuperBlock[sbIdx].fetch_or(1ULL << i, std::memory_order_relaxed);
-                    }
+                    if (NewWord == g_FullBlock)
+                        m_SuperBlock[SbIdx].fetch_or(1ULL << WordOff, std::memory_order_relaxed);
 
                     size_t ExpectedHint = m_SearchHint.load(std::memory_order_relaxed);
-                    if (WordIdx > ExpectedHint) {
+                    if (WordIdx > ExpectedHint)
                         m_SearchHint.compare_exchange_weak(ExpectedHint, WordIdx,
                                                            std::memory_order_relaxed,
                                                            std::memory_order_relaxed);
-                    }
 
-                    SlabDescriptor* Slab = &m_DescriptorSpan[GlobalIdx];
-                    Slab->ResetSlab();
-
-                    LOG_ALLOCATOR("DEBUG", "SlabRegistry: Allocated Slab[" << GlobalIdx << "] Word["
-                                                                           << WordIdx << "] Bit["
-                                                                           << BitIdx << "]");
-                    return Slab;
+                    break;
                 }
             }
         }
     }
 
-    LOG_ALLOCATOR("ERROR", "SlabRegistry: OUT OF MEMORY (Arena Full)");
-    return nullptr;
+    if (Acquired == 0)
+        LOG_ALLOCATOR("ERROR", "SlabRegistry: OUT OF MEMORY (Arena Full)");
+
+    return Acquired;
 }
 
 void SlabRegistry::FreeSlab(SlabDescriptor* SlabToFree) noexcept
@@ -221,12 +243,21 @@ void SlabRegistry::FreeSlab(SlabDescriptor* SlabToFree) noexcept
     const size_t WordIdx = static_cast<size_t>(Idx) >> 6;
     const uint64_t Mask = 1ULL << (static_cast<size_t>(Idx) & 63);
 
-    uint64_t OldVal = m_BitMap[WordIdx].fetch_and(~Mask, std::memory_order_release);
+    const uint64_t OldVal = m_BitMap[WordIdx].fetch_and(~Mask, std::memory_order_release);
 
     if (OldVal == g_FullBlock) {
         const size_t SbIdx = WordIdx / 64;
         const size_t SbBit = WordIdx % 64;
         m_SuperBlock[SbIdx].fetch_and(~(1ULL << SbBit), std::memory_order_relaxed);
+    }
+
+    {
+        size_t CurrentHint = m_SearchHint.load(std::memory_order_relaxed);
+        while (WordIdx < CurrentHint) {
+            if (m_SearchHint.compare_exchange_weak(CurrentHint, WordIdx, std::memory_order_relaxed,
+                                                   std::memory_order_relaxed))
+                break;
+        }
     }
 
     LOG_ALLOCATOR("DEBUG", "SlabRegistry: Freed Slab Index " << Idx);
@@ -240,13 +271,11 @@ SlabDescriptor* SlabRegistry::GetSlabDescriptor(void* Ptr) const noexcept
     const uintptr_t PtrVal = reinterpret_cast<uintptr_t>(Ptr);
     const uintptr_t StartVal = reinterpret_cast<uintptr_t>(m_ArenaSlabsStart);
 
-    if (PtrVal < StartVal || PtrVal >= (StartVal + (m_DescriptorCount * m_SlabSize))) {
+    if (PtrVal < StartVal || PtrVal >= (StartVal + (m_DescriptorCount * m_SlabSize)))
         return nullptr;
-    }
 
     const size_t Offset = PtrVal - StartVal;
     const size_t Index = Offset / m_SlabSize;
-
     return &m_DescriptorSpan[Index];
 }
 
@@ -254,6 +283,10 @@ void SlabRegistry::ShutdownArena() noexcept
 {
     if (m_ArenaRegistryStart) {
         LOG_ALLOCATOR("INFO", "SlabRegistry: Unmapping Arena at " << m_ArenaRegistryStart);
+
+        for (size_t i = 0; i < m_DescriptorCount; ++i)
+            m_DescriptorSpan[i].~SlabDescriptor();
+
         munmap(m_ArenaRegistryStart, m_ArenaSize);
         m_ArenaRegistryStart = nullptr;
     }

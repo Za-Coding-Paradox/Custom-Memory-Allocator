@@ -1,8 +1,4 @@
 #pragma once
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <span>
 #include <utilities/allocator_utility.h>
 
 namespace Allocator {
@@ -93,6 +89,9 @@ public:
     SlabRegistry& operator=(const SlabRegistry&) = delete;
 
     [[nodiscard]] SlabDescriptor* AllocateSlab() noexcept;
+
+    [[nodiscard]] size_t AllocateSlabBatch(size_t RequestCount, SlabDescriptor** OutSlabs) noexcept;
+
     void FreeSlab(SlabDescriptor* SlabToFree) noexcept;
 
     [[nodiscard]] SlabDescriptor* GetSlabDescriptor(void* Ptr) const noexcept;
@@ -101,4 +100,5 @@ public:
     [[nodiscard]] inline size_t GetArenaSize() const noexcept { return m_ArenaSize; }
     [[nodiscard]] inline void* GetArenaSlabsStart() const noexcept { return m_ArenaSlabsStart; }
 };
+
 } // namespace Allocator

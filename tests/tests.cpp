@@ -1165,53 +1165,254 @@ TEST_F(AllocatorStressTest, CacheThrashing_HandleTableAtomicSeparation)
     EXPECT_GT(opsPerSec, 1000000);
 }
 
+//
+//  WHAT THIS TEST ACTUALLY MEASURES:
+//    The variance in per-thread allocation throughput during steady-state
+//    operation, specifically looking for false sharing on TLS structures
+//    or shared hot-path atomics.
+//
+//  WHAT THE ORIGINAL TEST INCORRECTLY MEASURED:
+//    Total thread wall-time including first-slab acquisition, which folds
+//    in registry bitmap CAS contention and g_ContextMutex serialisation
+//    at thread startup — both of which are expected and are NOT false sharing.
+//
+//  THE FIX:
+//    Each thread pre-warms its TLS (acquires its first slab) BEFORE the
+//    sync barrier. The barrier then gates only the steady-state allocation
+//    loop, so the variance measurement is clean.
+// ============================================================================
+
 TEST_F(AllocatorStressTest, CacheThrashing_TLSBufferAccess)
 {
-    constexpr size_t g_ThreadCount = 16;
-    constexpr size_t g_AllocsPerThread = 10000;
+    constexpr size_t g_ThreadCount      = 16;
+    constexpr size_t g_AllocsPerThread  = 10000;
+    constexpr size_t g_WarmupAllocs     = 1;   // enough to trigger GrowSlabChain + RegisterThread
+    constexpr float  g_VarianceLimit    = 0.3f;
 
-    std::vector<size_t> threadTimes(g_ThreadCount);
-    std::barrier syncPoint(g_ThreadCount);
-
-    auto worker = [&](size_t tid) {
-        syncPoint.arrive_and_wait();
-
-        auto start = high_resolution_clock::now();
-
-        for (size_t i = 0; i < g_AllocsPerThread; ++i) {
-            void* ptr = m_Engine->Allocate<FrameLoad>(128);
-            if (!ptr)
-                break;
-        }
-
-        auto end = high_resolution_clock::now();
-        threadTimes[tid] = duration_cast<microseconds>(end - start).count();
+    // ── Per-thread result buckets ─────────────────────────────────────────────
+    // Each struct is padded to a full cache line so writing results never
+    // causes false sharing between threads (this was a silent bug in the
+    // original test: std::vector<size_t> packs results contiguously, so
+    // thread 0 and thread 1 shared a cache line and dirtied each other
+    // during the result write — not during timing, but still wrong).
+    struct alignas(64) ThreadResult
+    {
+        size_t  WarmupTimeUs       = 0;  // time to acquire first slab (should be high + variable)
+        size_t  SteadyStateTimeUs  = 0;  // time for the actual allocation loop (what we care about)
+        size_t  AllocsCompleted    = 0;  // how many allocs succeeded (< g_AllocsPerThread = OOM)
+        size_t  NullCount          = 0;  // number of nullptr returns during steady-state
+        bool    WarmupSucceeded    = false;
+        char    _pad[64 - (sizeof(size_t) * 4 + sizeof(bool)) % 64];
     };
 
+    std::array<ThreadResult, g_ThreadCount> Results{};
+
+    // ── Two barriers ──────────────────────────────────────────────────────────
+    // Barrier 1: all threads have completed warmup (slab acquired) before any
+    //            starts the timed loop. This isolates startup from measurement.
+    // Barrier 2: all threads start the timed loop at the exact same instant.
+    std::barrier warmupDone(g_ThreadCount);
+    std::barrier startTimed(g_ThreadCount);
+
+    auto worker = [&](size_t tid)
+    {
+        auto& R = Results[tid];
+
+        // ── Phase 1: Warmup (NOT timed for variance) ─────────────────────────
+        // This triggers GrowSlabChain() and RegisterThreadContext() for this
+        // thread. We time it separately so we can LOG it and confirm the
+        // startup contention hypothesis.
+        {
+            auto warmupStart = high_resolution_clock::now();
+
+            void* ptr = m_Engine->Allocate<FrameLoad>(128);
+            R.WarmupSucceeded = (ptr != nullptr);
+
+            auto warmupEnd = high_resolution_clock::now();
+            R.WarmupTimeUs = duration_cast<microseconds>(warmupEnd - warmupStart).count();
+        }
+
+        // Signal warmup complete, wait for all threads to finish warmup.
+        // If warmup times are HIGH and VARIABLE here, it confirms Problem 1+2
+        // (bitmap CAS thundering herd + g_ContextMutex serialisation).
+        warmupDone.arrive_and_wait();
+
+        // ── Phase 2: Steady-state timed loop ─────────────────────────────────
+        // All threads have slabs. No GrowSlabChain expected for the first
+        // g_ConstSlabSize / 128 = 512 allocations per slab.
+        // After 512 allocs, overflow will occur — this is expected and is
+        // a second checkpoint: does overflow cause inter-thread variance?
+        startTimed.arrive_and_wait();
+
+        auto loopStart = high_resolution_clock::now();
+
+        for (size_t i = 0; i < g_AllocsPerThread; ++i)
+        {
+            void* ptr = m_Engine->Allocate<FrameLoad>(128);
+            if (!ptr)
+            {
+                R.NullCount++;
+                // Do NOT break — keep going so we measure the full loop cost
+                // including OOM handling. If OOM happens, NullCount tells us.
+            }
+            R.AllocsCompleted++;
+        }
+
+        auto loopEnd = high_resolution_clock::now();
+        R.SteadyStateTimeUs = duration_cast<microseconds>(loopEnd - loopStart).count();
+    };
+
+    // ── Launch threads ────────────────────────────────────────────────────────
     std::vector<std::thread> threads;
-    for (size_t i = 0; i < g_ThreadCount; ++i) {
+    threads.reserve(g_ThreadCount);
+    for (size_t i = 0; i < g_ThreadCount; ++i)
         threads.emplace_back(worker, i);
-    }
-
-    for (auto& t : threads) {
+    for (auto& t : threads)
         t.join();
+
+    // ── Analyse warmup phase ──────────────────────────────────────────────────
+    // This is expected to be HIGH VARIANCE — it's the startup cost.
+    // If it's LOW variance, the registry is somehow not contended (unexpected).
+    {
+        size_t totalWarmup = 0;
+        size_t maxWarmup   = 0;
+        size_t minWarmup   = SIZE_MAX;
+        size_t failedWarmups = 0;
+
+        for (size_t i = 0; i < g_ThreadCount; ++i)
+        {
+            const auto& R = Results[i];
+            totalWarmup += R.WarmupTimeUs;
+            maxWarmup    = std::max(maxWarmup, R.WarmupTimeUs);
+            minWarmup    = std::min(minWarmup, R.WarmupTimeUs);
+            if (!R.WarmupSucceeded) failedWarmups++;
+        }
+
+        size_t avgWarmup = totalWarmup / g_ThreadCount;
+        float warmupVariance = (avgWarmup > 0)
+            ? static_cast<float>(maxWarmup - minWarmup) / static_cast<float>(avgWarmup)
+            : 0.0f;
+
+        std::cout << "\n=== PHASE 1: WARMUP (Slab Acquisition) ===\n"
+                  << "  Threads        : " << g_ThreadCount << "\n"
+                  << "  Failed warmups : " << failedWarmups << "\n"
+                  << "  Avg warmup     : " << avgWarmup    << " µs\n"
+                  << "  Min warmup     : " << minWarmup    << " µs\n"
+                  << "  Max warmup     : " << maxWarmup    << " µs\n"
+                  << "  Warmup spread  : " << (warmupVariance * 100.0f) << "%\n"
+                  << "\n  [DIAGNOSIS]\n";
+
+        if (warmupVariance > 1.0f)
+            std::cout << "  >> HIGH warmup variance (" << (warmupVariance*100.f) << "%) "
+                      << "confirms thundering herd on AllocateSlab() CAS "
+                      << "and/or g_ContextMutex serialisation.\n"
+                      << "  >> This is the PRIMARY reason the original test failed — "
+                      << "it included this cost in its variance measurement.\n";
+        else
+            std::cout << "  >> Low warmup variance — startup contention was minimal.\n";
+
+        if (avgWarmup > 100)
+            std::cout << "  >> High avg warmup time (" << avgWarmup << "µs) suggests "
+                      << "registry contention or mutex overhead is significant.\n";
+
+        // Print per-thread warmup times so we can see the serialisation staircase
+        std::cout << "  Per-thread warmup times (µs):\n    ";
+        for (size_t i = 0; i < g_ThreadCount; ++i)
+            std::cout << "[T" << i << ":" << Results[i].WarmupTimeUs << "] ";
+        std::cout << "\n";
+
+        EXPECT_EQ(failedWarmups, 0u) << "Some threads failed to acquire their first slab!";
     }
 
-    // Calculate variance in thread times
-    size_t avgTime = std::accumulate(threadTimes.begin(), threadTimes.end(), 0UL) / g_ThreadCount;
-    size_t maxTime = *std::max_element(threadTimes.begin(), threadTimes.end());
-    size_t minTime = *std::min_element(threadTimes.begin(), threadTimes.end());
+    // ── Analyse steady-state phase (THE ACTUAL VARIANCE CHECK) ───────────────
+    {
+        size_t totalTime  = 0;
+        size_t maxTime    = 0;
+        size_t minTime    = SIZE_MAX;
+        size_t totalNulls = 0;
 
-    float variance = static_cast<float>(maxTime - minTime) / static_cast<float>(avgTime);
+        for (size_t i = 0; i < g_ThreadCount; ++i)
+        {
+            const auto& R = Results[i];
+            totalTime  += R.SteadyStateTimeUs;
+            maxTime     = std::max(maxTime, R.SteadyStateTimeUs);
+            minTime     = std::min(minTime, R.SteadyStateTimeUs);
+            totalNulls += R.NullCount;
+        }
 
-    std::cout << "=== TLS BUFFER ACCESS VARIANCE ===\n"
-              << "Avg time: " << avgTime << " µs\n"
-              << "Min time: " << minTime << " µs\n"
-              << "Max time: " << maxTime << " µs\n"
-              << "Variance: " << (variance * 100) << "%\n";
+        size_t avgTime = totalTime / g_ThreadCount;
+        float variance = (avgTime > 0)
+            ? static_cast<float>(maxTime - minTime) / static_cast<float>(avgTime)
+            : 0.0f;
 
-    // Low variance indicates no false sharing
-    EXPECT_LT(variance, 0.3f) << "High variance suggests false sharing";
+        // Per-slab capacity: g_ConstSlabSize / alloc_size = 65536 / 128 = 512
+        // With 10000 allocs and 512 per slab, each thread needs ~20 slabs.
+        // Overflow happens at alloc #513, #1025, etc. — log if this is unexpected.
+        constexpr size_t g_SlabCapacity = 65536 / 128; // 512 allocs per slab
+        const size_t expectedOverflows = g_AllocsPerThread / g_SlabCapacity;
+
+        std::cout << "\n=== PHASE 2: STEADY-STATE ALLOCATION LOOP ===\n"
+                  << "  Allocs/thread  : " << g_AllocsPerThread << "\n"
+                  << "  Slab capacity  : " << g_SlabCapacity << " allocs @ 128B\n"
+                  << "  Expected slab  \n"
+                  << "  overflows/thrd : ~" << expectedOverflows << "\n"
+                  << "  Total OOM hits : " << totalNulls
+                      << (totalNulls > 0 ? "  !! UNEXPECTED — registry may be exhausted" : "") << "\n"
+                  << "\n"
+                  << "  Avg time       : " << avgTime    << " µs\n"
+                  << "  Min time       : " << minTime    << " µs\n"
+                  << "  Max time       : " << maxTime    << " µs\n"
+                  << "  Variance       : " << (variance * 100.0f) << "%"
+                      << " (limit: " << (g_VarianceLimit * 100.0f) << "%)\n"
+                  << "\n  [DIAGNOSIS]\n";
+
+        if (variance >= g_VarianceLimit)
+        {
+            std::cout << "  >> FAIL: variance=" << (variance*100.f) << "% exceeds limit.\n";
+
+            // Determine if the problem is in overflow (slab growth) or base loop
+            if (expectedOverflows > 0)
+                std::cout << "  >> Each thread triggers ~" << expectedOverflows
+                          << " slab overflows during the loop.\n"
+                          << "  >> Each overflow calls AllocateSlab() — check if bitmap CAS "
+                          << "contention during overflow is causing variance.\n"
+                          << "  >> Fix: pre-allocate enough slabs per thread OR reduce "
+                          << "g_AllocsPerThread to stay within one slab (" << g_SlabCapacity << " allocs).\n";
+            else
+                std::cout << "  >> No overflow expected — variance is from pure TLS bump alloc.\n"
+                          << "  >> Check ThreadLocalData padding in linear_module.h for "
+                          << "false sharing between adjacent TLS blocks.\n";
+        }
+        else
+        {
+            std::cout << "  >> PASS: steady-state variance is within acceptable range.\n"
+                      << "  >> TLS isolation is working correctly.\n";
+        }
+
+        // Per-thread breakdown — look for outliers
+        std::cout << "  Per-thread times (µs) | OOM hits:\n";
+        for (size_t i = 0; i < g_ThreadCount; ++i)
+        {
+            const auto& R = Results[i];
+            const bool isOutlier = (R.SteadyStateTimeUs > avgTime * 2 ||
+                                    R.SteadyStateTimeUs < avgTime / 2);
+            std::cout << "    T" << std::setw(2) << i << ": "
+                      << std::setw(6) << R.SteadyStateTimeUs << " µs"
+                      << "  nulls=" << R.NullCount
+                      << (isOutlier ? "  << OUTLIER" : "")
+                      << "\n";
+        }
+
+        EXPECT_EQ(totalNulls, 0u)
+            << "Allocations returned nullptr — registry may be exhausted. "
+            << "The registry needs at least " << (g_ThreadCount * expectedOverflows)
+            << " slabs for this test.";
+
+        EXPECT_LT(variance, g_VarianceLimit)
+            << "Steady-state variance " << (variance * 100.f)
+            << "% exceeds " << (g_VarianceLimit * 100.f) << "%. "
+            << "See diagnostic output above for root cause.";
+    }
 }
 
 TEST_F(AllocatorStressTest, CacheThrashing_SlabDescriptorMutexContention)

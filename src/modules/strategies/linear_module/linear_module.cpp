@@ -13,6 +13,8 @@ template <typename TContext> std::mutex LinearStrategyModule<TContext>::g_Contex
 template <typename TContext>
 std::vector<SlabDescriptor**> LinearStrategyModule<TContext>::g_ThreadHeads;
 
+template <typename TContext> static constexpr size_t g_SlabBatchSize = 8;
+
 template <typename TContext>
 void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
                                                        size_t AllocationAlignment) noexcept
@@ -60,10 +62,9 @@ void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
             }
         }
 
-        LOG_ALLOCATOR("WARN", "[L-OVERFLOW] Slab " << tls.ActiveSlab << " still cannot fit "
-                                                   << AllocationSize
-                                                   << "B @ align=" << AllocationAlignment
-                                                   << " (alignment waste). Advancing again.");
+        LOG_ALLOCATOR("WARN", "[L-OVERFLOW] Slab "
+                                  << tls.ActiveSlab << " still cannot fit " << AllocationSize
+                                  << "B @ align=" << AllocationAlignment << ". Advancing again.");
     }
 
     LOG_ALLOCATOR("ERROR", "[L-OVERFLOW] Exhausted "
@@ -75,27 +76,35 @@ void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
 template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain() noexcept
 {
     auto& tls = GetTLS();
-    SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
 
+    SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
     if (!Registry) {
         LOG_ALLOCATOR("CRITICAL", "LinearModule: Growth failed - Registry is NULL.");
         return;
     }
 
-    SlabDescriptor* NewSlab = Registry->AllocateSlab();
-    if (!NewSlab)
-        return;
+    SlabDescriptor* Batch[g_SlabBatchSize<TContext>];
+    const size_t Got = Registry->AllocateSlabBatch(g_SlabBatchSize<TContext>, Batch);
 
-    NewSlab->SetNextSlab(nullptr);
+    if (Got == 0) {
+        LOG_ALLOCATOR("ERROR", "LinearModule: Registry returned 0 slabs. OOM.");
+        return;
+    }
+
+    LOG_ALLOCATOR("DEBUG", "LinearModule: Acquired batch of " << Got << " slabs.");
+
+    for (size_t i = 0; i < Got - 1; ++i)
+        Batch[i]->SetNextSlab(Batch[i + 1]);
+    Batch[Got - 1]->SetNextSlab(nullptr);
 
     if (!tls.HeadSlab) {
-        tls.HeadSlab = NewSlab;
-        tls.ActiveSlab = NewSlab;
+        tls.HeadSlab = Batch[0];
+        tls.ActiveSlab = Batch[0];
         RegisterThreadContext(&tls.HeadSlab);
     }
     else {
-        tls.ActiveSlab->SetNextSlab(NewSlab);
-        tls.ActiveSlab = NewSlab;
+        tls.ActiveSlab->SetNextSlab(Batch[0]);
+        tls.ActiveSlab = Batch[0];
     }
 }
 
@@ -196,11 +205,10 @@ std::pair<SlabDescriptor*, uintptr_t> LinearStrategyModule<TContext>::GetCurrent
         return {nullptr, 0};
     }
 
-    uintptr_t currentOffset = tls.ActiveSlab->GetFreeListHead();
+    uintptr_t CurrentOffset = tls.ActiveSlab->GetFreeListHead();
     LOG_ALLOCATOR("DEBUG", "[L-STATE] Captured State: Slab [" << tls.ActiveSlab << "] Offset ["
-                                                              << currentOffset << "]");
-
-    return {tls.ActiveSlab, currentOffset};
+                                                              << CurrentOffset << "]");
+    return {tls.ActiveSlab, CurrentOffset};
 }
 
 template <typename TContext>
@@ -221,7 +229,6 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
                 Current = NextSlab;
             }
             tls.ActiveSlab = tls.HeadSlab;
-
             ALLOCATOR_DIAGNOSTIC({ FlushThreadStats(); });
         }
         return;
@@ -230,10 +237,9 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
     auto& tls = GetTLS();
 
     ALLOCATOR_DIAGNOSTIC({
-        size_t usedBefore = GetThreadTotalUsed();
-        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Starting Rewind. Thread current usage: " << usedBefore
-                                                                                    << " bytes.");
-        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Target: Slab [" << SavedSlab << "] Target Offset ["
+        size_t UsedBefore = GetThreadTotalUsed();
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Starting Rewind. Usage before: " << UsedBefore);
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Target: Slab [" << SavedSlab << "] Offset ["
                                                            << SavedOffset << "]");
     });
 
@@ -241,19 +247,15 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
     SlabDescriptor* Victim = SavedSlab->GetNextSlab();
 
     if (Victim != nullptr) {
-        LOG_ALLOCATOR("DEBUG",
-                      "[L-REWIND] Overflow detected. Detaching and returning trailing slab chain.");
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Overflow detected. Detaching trailing slab chain.");
 
         SavedSlab->SetNextSlab(nullptr);
         tls.ActiveSlab = SavedSlab;
 
         while (Victim != nullptr) {
             SlabDescriptor* NextVictim = Victim->GetNextSlab();
-            if (Registry) [[likely]] {
-                LOG_ALLOCATOR("DEBUG",
-                              "[L-REWIND] Returning orphaned slab " << Victim << " to Registry.");
+            if (Registry) [[likely]]
                 Registry->FreeSlab(Victim);
-            }
             Victim = NextVictim;
         }
     }
@@ -264,9 +266,8 @@ void LinearStrategyModule<TContext>::RewindState(SlabDescriptor* SavedSlab,
     LinearStrategy::RewindToMarker(*tls.ActiveSlab, SavedOffset);
 
     ALLOCATOR_DIAGNOSTIC({
-        size_t usedAfter = GetThreadTotalUsed();
-        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Rewind successful. Thread usage restored to "
-                                   << usedAfter << " bytes.");
+        size_t UsedAfter = GetThreadTotalUsed();
+        LOG_ALLOCATOR("DEBUG", "[L-REWIND] Rewind complete. Usage after: " << UsedAfter);
     });
 }
 
