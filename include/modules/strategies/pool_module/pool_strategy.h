@@ -17,19 +17,19 @@ public:
     [[nodiscard]] __attribute__((always_inline)) static inline void*
     Allocate(SlabDescriptor& SlabToAllocate) noexcept
     {
-        const uintptr_t AvailableAddress = SlabToAllocate.GetFreeListHead();
+        auto& Head = SlabToAllocate.GetFreeListHeadAtomic();
+        uintptr_t Current = Head.load(std::memory_order_acquire);
 
-        if (AvailableAddress == 0) [[unlikely]] {
-            return nullptr;
+        while (Current != 0) {
+            const uintptr_t Next = *reinterpret_cast<const uintptr_t*>(Current);
+
+            if (Head.compare_exchange_weak(Current, Next, std::memory_order_acquire,
+                                           std::memory_order_acquire)) {
+                ALLOCATOR_DIAGNOSTIC({ SlabToAllocate.IncrementActiveSlots(); });
+                return reinterpret_cast<void*>(Current);
+            }
         }
-
-        const uintptr_t NextFreeAddress = *reinterpret_cast<uintptr_t*>(AvailableAddress);
-
-        SlabToAllocate.UpdateFreeListHead(NextFreeAddress);
-
-        ALLOCATOR_DIAGNOSTIC({ SlabToAllocate.IncrementActiveSlots(); });
-
-        return reinterpret_cast<void*>(AvailableAddress);
+        return nullptr;
     }
 
     [[nodiscard]] __attribute__((always_inline)) static inline bool

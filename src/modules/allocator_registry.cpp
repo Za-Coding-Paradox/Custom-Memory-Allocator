@@ -11,7 +11,7 @@ SlabDescriptor::SlabDescriptor(const SlabConfig& Config) noexcept
 void SlabDescriptor::ResetSlab() noexcept
 {
     std::lock_guard<std::mutex> Lock(m_SlabMutex);
-    m_FreeListHead = m_SlabStart;
+    m_FreeListHead.store(m_SlabStart, std::memory_order_relaxed);
     m_ActiveSlots = 0;
     m_NextSlab = nullptr;
 }

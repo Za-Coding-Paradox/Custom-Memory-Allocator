@@ -32,11 +32,14 @@ void PoolStrategy::Free(SlabDescriptor& SlabToFree, void* MemoryToFree) noexcept
     if (MemoryToFree == nullptr) [[unlikely]]
         return;
 
-    const uintptr_t BlockToReturn = reinterpret_cast<uintptr_t>(MemoryToFree);
-    const uintptr_t OldHead = SlabToFree.GetFreeListHead();
+    auto& Head = SlabToFree.GetFreeListHeadAtomic();
+    const uintptr_t Block = reinterpret_cast<uintptr_t>(MemoryToFree);
 
-    *reinterpret_cast<uintptr_t*>(BlockToReturn) = OldHead;
-    SlabToFree.UpdateFreeListHead(BlockToReturn);
+    uintptr_t Current = Head.load(std::memory_order_relaxed);
+    do {
+        *reinterpret_cast<uintptr_t*>(Block) = Current;
+    } while (!Head.compare_exchange_weak(Current, Block, std::memory_order_release,
+                                         std::memory_order_relaxed));
 
     ALLOCATOR_DIAGNOSTIC({
         const size_t CurrentActive = SlabToFree.GetActiveSlots();
