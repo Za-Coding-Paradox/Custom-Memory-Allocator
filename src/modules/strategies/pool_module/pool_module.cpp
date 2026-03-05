@@ -9,7 +9,8 @@ template <typename TContext>
 std::atomic<SlabRegistry*> PoolModule<TContext>::g_SlabRegistry{nullptr};
 
 template <typename TContext> std::mutex PoolModule<TContext>::g_ContextMutex;
-template <typename TContext> std::vector<SlabDescriptor**> PoolModule<TContext>::g_ThreadHeads;
+template <typename TContext>
+std::vector<typename PoolModule<TContext>::ThreadLocalData*> PoolModule<TContext>::g_ThreadHeads;
 template <typename TContext> ContextStats PoolModule<TContext>::g_Stats;
 
 template <typename TContext> static constexpr size_t g_PoolSlabBatchSize = 4;
@@ -43,7 +44,7 @@ template <typename TContext> void PoolModule<TContext>::GrowSlabChain() noexcept
     if (tls.HeadSlab == nullptr) {
         Batch[Got - 1]->SetNextSlab(nullptr);
         tls.HeadSlab = Batch[0];
-        RegisterThreadContext(&tls.HeadSlab);
+        RegisterThreadContext(&tls);
     }
     else {
         Batch[Got - 1]->SetNextSlab(tls.HeadSlab);
@@ -81,17 +82,17 @@ void PoolModule<TContext>::InitializeModule(SlabRegistry* RegistryInstance) noex
 }
 
 template <typename TContext>
-void PoolModule<TContext>::RegisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept
+void PoolModule<TContext>::RegisterThreadContext(ThreadLocalData* TLS) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    g_ThreadHeads.push_back(ThreadHeadPtr);
+    g_ThreadHeads.push_back(TLS);
 }
 
 template <typename TContext>
-void PoolModule<TContext>::UnregisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept
+void PoolModule<TContext>::UnregisterThreadContext(ThreadLocalData* TLS) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    std::erase(g_ThreadHeads, ThreadHeadPtr);
+    std::erase(g_ThreadHeads, TLS);
 }
 
 template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcept
@@ -102,7 +103,7 @@ template <typename TContext> void PoolModule<TContext>::ShutdownModule() noexcep
     LOG_ALLOCATOR("INFO", "Pool[" << g_ChunkSize << "B]: Thread Shutdown.");
 
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
-    UnregisterThreadContext(&tls.HeadSlab);
+    UnregisterThreadContext(&tls);
 
     SlabDescriptor* Current = tls.HeadSlab;
     while (Current) {
@@ -122,16 +123,20 @@ template <typename TContext> void PoolModule<TContext>::ShutdownSystem() noexcep
         return;
 
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    for (SlabDescriptor** HeadPtr : g_ThreadHeads) {
-        if (HeadPtr && *HeadPtr) {
-            SlabDescriptor* Current = *HeadPtr;
-            while (Current) {
-                SlabDescriptor* Next = Current->GetNextSlab();
-                Registry->FreeSlab(Current);
-                Current = Next;
-            }
-            *HeadPtr = nullptr;
+    for (ThreadLocalData* TLSEntry : g_ThreadHeads) {
+        if (!TLSEntry)
+            continue;
+
+        SlabDescriptor* Current = TLSEntry->HeadSlab;
+        while (Current) {
+            SlabDescriptor* Next = Current->GetNextSlab();
+            Registry->FreeSlab(Current);
+            Current = Next;
         }
+
+        TLSEntry->HeadSlab = nullptr;
+        TLSEntry->ActiveSlab = nullptr;
+        TLSEntry->FirstNonFullSlab = nullptr;
     }
     g_ThreadHeads.clear();
 }

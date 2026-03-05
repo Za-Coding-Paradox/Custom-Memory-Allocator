@@ -40,12 +40,12 @@ private:
     static thread_local PoolModuleThreadGuard<TContext> g_ThreadGuard;
     static std::atomic<SlabRegistry*> g_SlabRegistry;
     static std::mutex g_ContextMutex;
-    static std::vector<SlabDescriptor**> g_ThreadHeads;
+    static std::vector<ThreadLocalData*> g_ThreadHeads;
     static ContextStats g_Stats;
 
     static void GrowSlabChain() noexcept;
-    static void RegisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept;
-    static void UnregisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept;
+    static void RegisterThreadContext(ThreadLocalData* TLS) noexcept;
+    static void UnregisterThreadContext(ThreadLocalData* TLS) noexcept;
     static void UpdatePeakUsage() noexcept;
 
     friend struct PoolModuleThreadGuard<TContext>;
