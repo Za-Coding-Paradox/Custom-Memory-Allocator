@@ -27,8 +27,16 @@ public:
         size_t AllocCount = 0;
         size_t FreeCount = 0;
 
-        char Padding[64 - (sizeof(uint64_t) * 4 + sizeof(void*) * 3) % 64];
+        static constexpr size_t kDataSize = sizeof(SlabDescriptor*) * 3 + sizeof(size_t) * 4;
+
+        static constexpr size_t kPadSize = (64 - (kDataSize % 64)) % 64;
+
+        char Padding[kPadSize > 0 ? kPadSize : 1];
     };
+
+    static_assert(sizeof(ThreadLocalData) % 64 == 0,
+                  "ThreadLocalData size must be a multiple of 64 bytes (one cache line). "
+                  "Update kDataSize or add more padding.");
 
 private:
     [[nodiscard]] static __attribute__((always_inline)) inline ThreadLocalData& GetTLS() noexcept
@@ -94,13 +102,8 @@ public:
         void* Result = nullptr;
 
         if (tls.ActiveSlab) [[likely]] {
-            std::lock_guard<std::mutex> Lock(tls.ActiveSlab->GetMutex());
-
-            if (PoolStrategy::CanFit(*tls.ActiveSlab)) {
-                LOG_ALLOCATOR("DEBUG",
-                              "Pool[" << g_ChunkSize << "B]: Allocating from Active Slab.");
-                Result = PoolStrategy::Allocate(*tls.ActiveSlab);
-            }
+            LOG_ALLOCATOR("DEBUG", "Pool[" << g_ChunkSize << "B]: Allocating from Active Slab.");
+            Result = PoolStrategy::Allocate(*tls.ActiveSlab);
         }
 
         if (Result == nullptr) {
@@ -109,17 +112,11 @@ public:
             SlabDescriptor* Current = (tls.FirstNonFullSlab) ? tls.FirstNonFullSlab : tls.HeadSlab;
 
             while (Current) {
-                {
-                    std::lock_guard<std::mutex> Lock(Current->GetMutex());
-
-                    if (PoolStrategy::CanFit(*Current)) {
-                        tls.ActiveSlab = Current;
-                        tls.FirstNonFullSlab = Current;
-
-                        Result = PoolStrategy::Allocate(*tls.ActiveSlab);
-
-                        goto AllocationSuccess;
-                    }
+                Result = PoolStrategy::Allocate(*Current);
+                if (Result) {
+                    tls.ActiveSlab = Current;
+                    tls.FirstNonFullSlab = Current;
+                    goto AllocationSuccess;
                 }
                 Current = Current->GetNextSlab();
             }
@@ -130,10 +127,7 @@ public:
                 GrowSlabChain();
 
                 if (tls.ActiveSlab) {
-                    std::lock_guard<std::mutex> Lock(tls.ActiveSlab->GetMutex());
-                    if (PoolStrategy::CanFit(*tls.ActiveSlab)) {
-                        Result = PoolStrategy::Allocate(*tls.ActiveSlab);
-                    }
+                    Result = PoolStrategy::Allocate(*tls.ActiveSlab);
                 }
             }
         }
@@ -163,10 +157,7 @@ public:
         SlabDescriptor* Slab = Registry->GetSlabDescriptor(MemoryToFree);
 
         if (Slab) [[likely]] {
-            {
-                std::lock_guard<std::mutex> Lock(Slab->GetMutex());
-                PoolStrategy::Free(*Slab, MemoryToFree);
-            }
+            PoolStrategy::Free(*Slab, MemoryToFree);
 
             ALLOCATOR_DIAGNOSTIC({
                 auto& tls = GetTLS();

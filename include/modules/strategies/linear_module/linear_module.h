@@ -20,8 +20,16 @@ public:
         size_t ThreadCount = 0;
         size_t ThreadPeak = 0;
 
-        char Padding[64 - (sizeof(uint64_t) * 4 + sizeof(void*) * 3) % 64];
+        static constexpr size_t kDataSize = sizeof(SlabDescriptor*) * 2 + sizeof(size_t) * 4;
+
+        static constexpr size_t kPadSize = (64 - (kDataSize % 64)) % 64;
+
+        char Padding[kPadSize > 0 ? kPadSize : 1];
     };
+
+    static_assert(sizeof(ThreadLocalData) % 64 == 0,
+                  "ThreadLocalData size must be a multiple of 64 bytes (one cache line). "
+                  "Update kDataSize or add more padding.");
 
 private:
     [[nodiscard]] static __attribute__((always_inline)) inline ThreadLocalData& GetTLS() noexcept
@@ -35,13 +43,13 @@ private:
     static std::atomic<SlabRegistry*> g_SlabRegistry;
     static ContextStats g_GlobalStats;
     static std::mutex g_ContextMutex;
-    static std::vector<ThreadLocalData*> g_ThreadHeads;
+    static std::vector<SlabDescriptor**> g_ThreadHeads;
 
     [[nodiscard]] static void* OverFlowAllocate(size_t AllocationSize,
                                                 size_t AllocationAlignment) noexcept;
     static void GrowSlabChain() noexcept;
-    static void RegisterThreadContext(ThreadLocalData* TLS) noexcept;
-    static void UnregisterThreadContext(ThreadLocalData* TLS) noexcept;
+    static void RegisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept;
+    static void UnregisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept;
 
     friend class LinearModuleThreadGuard<TContext>;
     friend class AllocatorEngine;
