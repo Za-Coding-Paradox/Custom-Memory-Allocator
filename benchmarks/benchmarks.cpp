@@ -162,7 +162,7 @@ struct Bucket256 { char data[256]; };
 // =============================================================================
 
 static constexpr size_t kSlabSize  = 64ULL  * 1024;         // 64 KB
-static constexpr size_t kArenaSize = 256ULL  * 1024 * 1024; // 256 MB
+static constexpr size_t kArenaSize = 128ULL * 1024 * 1024; // 128 MB
 static constexpr int    kRuns      = 7;   // median of this many runs per bench
 static bool             g_CSV      = false;
 
@@ -280,8 +280,12 @@ static void PrintCSV()
 //  malloc = tcmalloc / jemalloc thread-cache.
 // =============================================================================
 
-static void BenchThroughput(AllocatorEngine& eng)
+static void BenchThroughput()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t N = 200'000;
 
     // ── Linear 64B ───────────────────────────────────────────────────────
@@ -340,8 +344,12 @@ static void BenchThroughput(AllocatorEngine& eng)
 //  Tests freelist recycling throughput and metadata overhead over time.
 // =============================================================================
 
-static void BenchChurn(AllocatorEngine& eng)
+static void BenchChurn()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kSlots  = 4096;
     constexpr size_t kRounds = 100;
     constexpr size_t kOps    = kSlots + (kSlots/2) * kRounds * 2;
@@ -393,8 +401,12 @@ static void BenchChurn(AllocatorEngine& eng)
 //  allocator's advantage grows or collapses relative to malloc.
 // =============================================================================
 
-static void BenchSizeSweep(AllocatorEngine& eng)
+static void BenchSizeSweep()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t N = 100'000;
     const size_t sizes[] = {16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384};
 
@@ -427,8 +439,12 @@ static void BenchSizeSweep(AllocatorEngine& eng)
 //    Pool read       — measures handle-table indirection overhead
 // =============================================================================
 
-static void BenchCacheCoherency(AllocatorEngine& eng)
+static void BenchCacheCoherency()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kObjs   = 16384;
     constexpr size_t kPasses = 8;
 
@@ -437,9 +453,9 @@ static void BenchCacheCoherency(AllocatorEngine& eng)
         std::vector<void*> cp(kObjs), mp(kObjs);
         for (size_t i = 0; i < kObjs; ++i) {
             cp[i] = eng.Allocate<LevelLoad>(64);
-            static_cast<volatile char*>(cp[i])[0] = (char)i;
+            if (cp[i]) static_cast<volatile char*>(cp[i])[0] = (char)i;
             mp[i] = malloc(64);
-            static_cast<volatile char*>(mp[i])[0] = (char)i;
+            if (mp[i]) static_cast<volatile char*>(mp[i])[0] = (char)i;
         }
         int64_t cT = MedianNs([&]{
             volatile size_t s = 0;
@@ -465,9 +481,9 @@ static void BenchCacheCoherency(AllocatorEngine& eng)
         std::vector<void*> cp(kObjs), mp(kObjs);
         for (size_t i = 0; i < kObjs; ++i) {
             cp[i] = eng.Allocate<LevelLoad>(64);
-            static_cast<volatile char*>(cp[i])[0] = (char)i;
+            if (cp[i]) static_cast<volatile char*>(cp[i])[0] = (char)i;
             mp[i] = malloc(64);
-            static_cast<volatile char*>(mp[i])[0] = (char)i;
+            if (mp[i]) static_cast<volatile char*>(mp[i])[0] = (char)i;
         }
         int64_t cT = MedianNs([&]{
             volatile size_t s = 0;
@@ -527,8 +543,12 @@ static void BenchCacheCoherency(AllocatorEngine& eng)
 //  slots immediately.  malloc coalesces based on heap strategy.
 // =============================================================================
 
-static void BenchFragmentation(AllocatorEngine& eng)
+static void BenchFragmentation()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kSlots  = 2048;
     constexpr size_t kCycles = 50;
 
@@ -590,8 +610,12 @@ static void BenchFragmentation(AllocatorEngine& eng)
 //  TLS isolation, vs malloc's per-thread cache contention.
 // =============================================================================
 
-static void BenchConcurrency(AllocatorEngine& eng)
+static void BenchConcurrency()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kPerThread = 20'000;
     const size_t threadCounts[] = {2, 4, 8, 16};
 
@@ -638,8 +662,12 @@ static void BenchConcurrency(AllocatorEngine& eng)
 //  malloc requires N individual free() calls.
 // =============================================================================
 
-static void BenchReset(AllocatorEngine& eng)
+static void BenchReset()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kAllocsPerFrame = 10'000;
     constexpr size_t kFrames         = 1'000;
 
@@ -694,8 +722,12 @@ static void BenchReset(AllocatorEngine& eng)
 //  Quantifies the safety-indirection cost.
 // =============================================================================
 
-static void BenchHandleResolution(AllocatorEngine& eng)
+static void BenchHandleResolution()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kHandles = 50'000;
     constexpr size_t kLookups = 2'000'000;
 
@@ -734,8 +766,12 @@ static void BenchHandleResolution(AllocatorEngine& eng)
 //  Stresses both subsystems together under a realistic call pattern.
 // =============================================================================
 
-static void BenchGameSim(AllocatorEngine& eng)
+static void BenchGameSim()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kFrames     = 2000;
     constexpr size_t kScratch    = 512;
     constexpr size_t kEntities   = 128;
@@ -794,10 +830,15 @@ static void BenchGameSim(AllocatorEngine& eng)
 //  main table.  Included in table as avg-time comparison.
 // =============================================================================
 
-static void BenchFalseSharing(AllocatorEngine& eng)
+static void BenchFalseSharing()
 {
+    AllocatorEngine eng(kSlabSize, kArenaSize);
+    eng.Initialize();
+
+
     constexpr size_t kThreads     = 16;
-    constexpr size_t kAllocsPerTh = 100'000;
+    // 16 threads x 40K allocs x 128B = 80MB < 128MB arena budget.
+    constexpr size_t kAllocsPerTh = 40'000;
 
     // Pre-warm: each thread acquires its slab chain before the timed phase.
     {
@@ -915,14 +956,11 @@ int main(int argc, char* argv[])
     if (!g_CSV) {
         printf("\n╔══════════════════════════════════════════════════════════════╗\n");
         printf("║  CUSTOM ALLOCATOR vs malloc  —  Full Benchmark Suite         ║\n");
-        printf("║  Arena: 256MB | Slab: 64KB | Median of %d runs per bench     ║\n", kRuns);
+        printf("║  Arena: 128MB | Slab: 64KB | Median of %d runs per bench      ║\n", kRuns);
         printf("╚══════════════════════════════════════════════════════════════╝\n\n");
     }
 
-    AllocatorEngine eng(kSlabSize, kArenaSize);
-    eng.Initialize();
-
-    const struct { const char* label; void(*fn)(AllocatorEngine&); } suite[] = {
+    const struct { const char* label; void(*fn)(); } suite[] = {
         { "  I.    Throughput",         BenchThroughput      },
         { "  II.   Churn",              BenchChurn           },
         { "  III.  Size sweep",         BenchSizeSweep       },
@@ -937,7 +975,7 @@ int main(int argc, char* argv[])
 
     for (const auto& s : suite) {
         if (!g_CSV) printf("%s...\n", s.label);
-        s.fn(eng);
+        s.fn();
     }
 
     if (g_CSV) PrintCSV();
