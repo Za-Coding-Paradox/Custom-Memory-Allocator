@@ -584,7 +584,7 @@ CPU governor: performance. ASLR disabled (`/proc/sys/kernel/randomize_va_space =
 
 The pool allocator's churn penalty (6x slower than malloc's tcache under 50%
 recycle rate) is the only structural regression. The root cause and remediation
-plan are documented in [documentation/PERFORMANCE_REPORT](documentation/PERFORMANCE_REPORT.md).
+plan are documented in [documentation/reports/PERFORMANCE_REPORT](documentation/reports/PERFORMANCE_REPORT.md).
 
 **Hardware counters** (`perf stat`, pinned to core 0, full benchmark run):
 
@@ -607,7 +607,7 @@ is approximately **4.5%** of total program instructions.
 For the full micro-architectural analysis — including per-function cycle
 attribution, branch mispredict rates, heaptrack allocation lifecycle, and
 latency distribution methodology — see
-[documentation/PERFORMANCE_REPORT](documentation/PERFORMANCE_REPORT.md).
+[documentation/reports/PERFORMANCE_REPORT](documentation/reports/PERFORMANCE_REPORT.md).
 
 ---
 
