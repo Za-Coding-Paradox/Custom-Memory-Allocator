@@ -5,45 +5,52 @@ flowchart TD
     classDef atomicOp fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff
     classDef hardware fill:#6c5ce7,stroke:#a29bfe,stroke-width:2px,color:#fff
 
-    Start([User: engine->AllocateWithHandle<RigidBody>()]) --> TraitResolution
+    Start(["User: engine->AllocateWithHandle<RigidBody>()"]) --> TraitResolution
     
-    subgraph Compile_Time_Resolution [Compile-Time Trait Routing (0 ns)]
-        TraitResolution{ScopeTraits<PoolScope<RigidBody>>} ::: compileTime
+    subgraph "Compile-Time Trait Routing"
+        TraitResolution{"ScopeTraits<PoolScope<RigidBody>>"}
         TraitResolution -- "IsPool == true\nSupportsHandles == true" --> SizeRoute
-        SizeRoute[PoolMap evaluates sizeof(RigidBody) < 64] ::: compileTime
-        SizeRoute -- Instantiates --> BucketScope[BucketScope<64>] ::: compileTime
+        SizeRoute["PoolMap evaluates sizeof(RigidBody) < 64"]
+        SizeRoute -- Instantiates --> BucketScope["BucketScope<64>"]
     end
 
     BucketScope --> TLS_Load
 
-    subgraph Thread_Local_Fast_Path [L1 Cache Fast Path ~26.25 ns]
-        TLS_Load[Load alignas 64 ThreadLocalData] --> TLSSlotCheck{FirstNonFullSlab\nhas empty slot?}
-        TLSSlotCheck -- Yes --> TLSPop[Pop FreeListHead Cursor] ::: fastPath
+    subgraph "Thread-Local Fast Path"
+        TLS_Load["Load alignas 64 ThreadLocalData"] --> TLSSlotCheck{"FirstNonFullSlab\nhas empty slot?"}
+        TLSSlotCheck -- Yes --> TLSPop["Pop FreeListHead Cursor"]
     end
 
-    subgraph Synchronization_Boundary [g_ContextMutex Boundary]
-        TLSSlotCheck -- No (Chain Exhausted) --> MutexAcquire((Acquire Mutex)) ::: slowPath
-        MutexAcquire --> RegistryCall[SlabRegistry::AllocateSlabBatch]
+    subgraph "g_ContextMutex Boundary"
+        TLSSlotCheck -- "No (Chain Exhausted)" --> MutexAcquire(("Acquire Mutex"))
+        MutexAcquire --> RegistryCall["SlabRegistry::AllocateSlabBatch"]
     end
 
-    subgraph Physical_Memory_Retrieval [Amortized O(1) Slab Fetch]
-        RegistryCall --> LoadHint[Load atomic m_SearchHint]
-        LoadHint --> SuperBlockRead[Read m_SuperBlock]
-        SuperBlockRead --> POPCNT[Hardware POPCNT / ffs\nFind 64-slab block] ::: hardware
-        POPCNT --> MapRead[Read m_BitMap uint64_t]
-        MapRead --> CASBitmap{CAS BitMap 1 -> 0} ::: atomicOp
-        CASBitmap -- Success --> FormatBatch[Format SlabDescriptors]
-        FormatBatch --> MutexRelease((Release Mutex)) ::: slowPath
+    subgraph "Amortized Slab Fetch"
+        RegistryCall --> LoadHint["Load atomic m_SearchHint"]
+        LoadHint --> SuperBlockRead["Read m_SuperBlock"]
+        SuperBlockRead --> POPCNT["Hardware POPCNT / ffs\nFind 64-slab block"]
+        POPCNT --> MapRead["Read m_BitMap uint64_t"]
+        MapRead --> CASBitmap{"CAS BitMap 1 -> 0"}
+        CASBitmap -- Success --> FormatBatch["Format SlabDescriptors"]
+        FormatBatch --> MutexRelease(("Release Mutex"))
     end
     
-    MutexRelease --> LinkTLS[Append Slab Batch to TLS] --> TLSPop
+    MutexRelease --> LinkTLS["Append Slab Batch to TLS"] --> TLSPop
 
-    subgraph Handle_Generation [Lock-Free Seqlock Directory]
-        TLSPop --> HT_Hash[HT Shard = hash(thread_id) % 32]
-        HT_Hash --> HT_PageLocate[Index into 65536 Page Array]
-        HT_PageLocate --> HT_CASPtr{CAS void* into HandleMetadata} ::: atomicOp
-        HT_CASPtr -- Success --> HT_IncGen[Atomic Fetch_Add Generation] ::: atomicOp
+    subgraph "Lock-Free Seqlock Directory"
+        TLSPop --> HT_Hash["HT Shard = hash(thread_id) % 32"]
+        HT_Hash --> HT_PageLocate["Index into 65536 Page Array"]
+        HT_PageLocate --> HT_CASPtr{"CAS void* into HandleMetadata"}
+        HT_CASPtr -- Success --> HT_IncGen["Atomic Fetch_Add Generation"]
         HT_IncGen --> BitPack["Pack 64-bit:\n(Gen << 32) | (Shard << 27) | Index"]
     end
 
-    BitPack --> Return([Return Handle to User])
+    BitPack --> Return(["Return Handle to User"])
+
+    %% Safe Class Assignments
+    class TraitResolution,SizeRoute,BucketScope compileTime;
+    class TLSPop fastPath;
+    class MutexAcquire,MutexRelease slowPath;
+    class CASBitmap,HT_CASPtr,HT_IncGen atomicOp;
+    class POPCNT hardware;
