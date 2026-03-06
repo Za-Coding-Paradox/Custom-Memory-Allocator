@@ -1,35 +1,38 @@
 flowchart TD
-    Start([Allocate 1 Block]) --> TryActive[Try ActiveSlab]
+    Start([PoolModule::Allocate]) --> LoadTLS[Load TLS ActiveSlab]
     
-    TryActive --> ActiveFit{Fits?}
-    ActiveFit -- Yes --> DoAlloc[Mark Slot Used]
+    LoadTLS --> CheckActive{ActiveSlab has free slot?}
+    CheckActive -- Yes (Fast Path) --> PopSlot[Pop from TLS m_FreeListHead]
     
-    ActiveFit -- No --> OptPath{Check Cursor g_FirstNonFullSlab}
+    CheckActive -- No --> CheckCursor{FirstNonFullSlab valid?}
     
-    subgraph "Optimization Loop"
-        OptPath -- Valid --> StartCursor[Start Search at Cursor]
-        OptPath -- Null --> StartHead[Start Search at Head]
+    subgraph "Thread-Local Chain Scan"
+        CheckCursor -- Valid --> StartScan[Scan from FirstNonFullSlab]
+        CheckCursor -- Null --> ScanHead[Scan from HeadSlab]
         
-        StartCursor --> CheckSlab{Slab Has Space?}
-        StartHead --> CheckSlab
+        StartScan --> SlabCheck{Space Available?}
+        ScanHead --> SlabCheck
         
-        CheckSlab -- No (Full) --> AdvanceCursor[Advance Cursor to Next]
-        AdvanceCursor --> MoveNext[Move Current to Next]
-        MoveNext --> LoopCheck{End of Chain?}
-        
-        LoopCheck -- No --> CheckSlab
-        LoopCheck -- Yes --> Grow[Grow Chain]
+        SlabCheck -- No (Full) --> MoveNext[Iterate NextSlab] --> ChainEnd{End of Chain?}
+        ChainEnd -- No --> SlabCheck
+        ChainEnd -- Yes --> SlowPath[GrowSlabChain]
     end
     
-    CheckSlab -- Yes (Found) --> UpdateState[Update g_ActiveSlab]
-    UpdateState --> UpdateOpt[Update g_FirstNonFullSlab]
-    UpdateOpt --> DoAlloc
+    SlabCheck -- Yes --> UpdateState[ActiveSlab = Current] --> PopSlot
     
-    Grow --> NewSlab[Registry->AllocateSlab]
-    NewSlab --> Format[Format Slots]
-    Format --> SetActive[Set as Active]
-    SetActive --> SetCursor[Set Cursor to New]
-    SetCursor --> DoAlloc
+    subgraph "Batched Registry Fetch (Slow Path)"
+        SlowPath --> Lock[Acquire g_ContextMutex]
+        Lock --> Batch[Registry->AllocateSlabBatch]
+        Batch --> Link[Append N Slabs to TLS Chain]
+        Link --> Unlock[Release g_ContextMutex] --> PopSlot
+    end
     
-    DoAlloc --> UpdateStats[Update Stats]
-    UpdateStats --> RetPtr([Return void*])
+    PopSlot --> RetPtr([Return void*])
+
+    subgraph "Global Deallocation (PoolStrategy::Free)"
+        StartFree([FreeHandle]) --> ExtractBucket[Resolve to Bucket Scope]
+        ExtractBucket --> LoadCAS[Load atomic GlobalFreeList]
+        LoadCAS --> CASLoop{atomic_compare_exchange_weak}
+        CASLoop -- Fail (ABA Contention) --> CASLoop
+        CASLoop -- Success --> EndFree([Memory Reclaimed])
+    end

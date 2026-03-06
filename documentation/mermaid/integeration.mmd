@@ -1,0 +1,69 @@
+flowchart TB
+    classDef osLayer fill:#2d3436,stroke:#636e72,color:#fff
+    classDef sharedMem fill:#0984e3,stroke:#74b9ff,color:#fff
+    classDef tlsMem fill:#00b894,stroke:#55efc4,color:#fff
+    classDef cpuCore fill:#e17055,stroke:#fab1a0,color:#fff
+    
+    subgraph OS_Kernel [Linux OS & Hardware Layer]
+        MMAP[mmap syscall\nMAP_ANONYMOUS] ::: osLayer
+        PF[do_anonymous_page\nDemand Zeroing Handler] ::: osLayer
+        RAM[(Physical RAM\nNUMA Node 0)] ::: osLayer
+        
+        MMAP -->|Pre-faulted via memset| PF
+        PF -.->|Mapped Pages| RAM
+    end
+
+    subgraph Process_Space [Process Virtual Address Space]
+        direction LR
+        
+        subgraph Global_Shared_State [Allocator Shared Memory (Heap)]
+            Engine[AllocatorEngine Base] ::: sharedMem
+            
+            subgraph Physical_Registry [SlabRegistry: 512MB]
+                Bitmap[m_BitMap & m_SuperBlock\n130x uint64_t] ::: sharedMem
+                Arena[Contiguous Virtual Arena\n8192x 64KB Slabs] ::: sharedMem
+                Bitmap -.->|Bit represents Slab| Arena
+            end
+            
+            subgraph Safety_Directory [HandleTable: 16.78MB Static]
+                Shards[32x HandleTableShard] ::: sharedMem
+                Pages[65536 Lazy Pages per Shard] ::: sharedMem
+                Shards --> Pages
+            end
+            
+            Engine --> Physical_Registry
+            Engine --> Safety_Directory
+        end
+        
+        subgraph CPU_Execution [Thread Execution Environment]
+            direction TB
+            subgraph Core0 [CPU Core 0 / Thread A]
+                L1_0[L1 Cache Hit] ::: cpuCore
+                TLS_0[Module ThreadLocalData\nalignas 64 bytes] ::: tlsMem
+                L1_0 --- TLS_0
+            end
+            
+            subgraph CoreN [CPU Core N / Thread B]
+                L1_N[L1 Cache Hit] ::: cpuCore
+                TLS_N[Module ThreadLocalData\nalignas 64 bytes] ::: tlsMem
+                L1_N --- TLS_N
+            end
+        end
+    end
+
+    %% Cross-boundary interactions
+    Arena ===|mmap backing| MMAP
+    
+    %% Fast path isolation
+    TLS_0 -.->|MESI Isolated| TLS_N
+    
+    %% Slow path interactions
+    TLS_0 ==>|GrowSlabChain\nMutex Contention| Bitmap
+    TLS_N ==>|GrowSlabChain\nMutex Contention| Bitmap
+    
+    Core0 ==>|Hash % 32 = Shard X| Shards
+    CoreN ==>|Hash % 32 = Shard Y| Shards
+    
+    %% Annotations
+    note1>Pre-faulting bypasses ~1.5 µs OS page-fault overhead per 4KB chunk]
+    PF -.- note1
