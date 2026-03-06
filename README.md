@@ -1,4 +1,4 @@
-m![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
+![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
 ![CMake 3.14+](https://img.shields.io/badge/CMake-3.14%2B-green.svg)
 ![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
