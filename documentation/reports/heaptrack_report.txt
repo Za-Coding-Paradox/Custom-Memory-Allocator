@@ -1,1 +1,489 @@
-reading file "heaptrack.allocator_benchmark.37729.zst" - please wait, this might take some time...
+reading file "heaptrack.allocator_benchmark.88968.zst" - please wait, this might take some time...
+Debuggee command was: ./build/release/allocator_benchmark
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+105000014 calls to allocation functions with 0B peak consumption from
+BenchReset()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+10000000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+10000000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+10000000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+10000000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+10000000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 55000014 from 23 other places
+
+58691661 calls to allocation functions with 0B peak consumption from
+BenchSizeSweep()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8384512 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8384512 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8384512 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8384512 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8384512 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 16769101 from 9 other places
+
+7630002 calls to allocation functions with 0B peak consumption from
+BenchGameSim()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+7168000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+448000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+14000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+5600029 calls to allocation functions with 104.00M peak consumption from
+BenchThroughput()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+200000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+200000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+200000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+200000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+200000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 4600029 from 52 other places
+
+4200210 calls to allocation functions with 0B peak consumption from
+std::thread::_State_impl<>::_M_run()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+4200000 calls with 0B peak consumption from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+210 calls with 0B peak consumption from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+
+2924572 calls to allocation functions with 0B peak consumption from
+BenchChurn()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+204800 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+204800 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+204800 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+204800 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+204800 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 1900572 from 39 other places
+
+745514 calls to allocation functions with 0B peak consumption from
+BenchFragmentation()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+179200 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+179200 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+51200 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+51200 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+51200 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 233514 from 25 other places
+
+640016 calls to allocation functions with 0B peak consumption from
+std::thread::_State_impl<>::_M_run()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+640000 calls with 0B peak consumption from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+16 calls with 0B peak consumption from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+
+50002 calls to allocation functions with 0B peak consumption from
+BenchHandleResolution()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50000 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+36870 calls to allocation functions with 0B peak consumption from
+BenchCacheCoherency()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+16384 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+16384 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+4096 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 calls with 0B peak consumption from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 4 from 4 other places
+
+
+PEAK MEMORY CONSUMERS
+104.00M peak memory consumed over 5600029 calls from
+BenchThroughput()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+102.40M consumed over 200000 calls from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1.60M consumed over 1 calls from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 52 other places
+
+16.78M peak memory consumed over 69 calls from
+operator new(unsigned long, std::align_val_t)
+  in /usr/lib/libstdc++.so.6
+16.78M consumed over 1 calls from:
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 10 other places
+
+524.29K peak memory consumed over 870 calls from
+operator new[](unsigned long, std::nothrow_t const&)
+  in /usr/lib/libstdc++.so.6
+524.29K consumed over 32 calls from:
+    Allocator::HandleTableShard::GrowCapacity()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    Allocator::HandleTable::HandleTable(unsigned int)
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 11 other places
+
+73.73K peak memory consumed over 1 calls from
+0x7ffff7cae0ef
+  in /usr/lib/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    0x7ffff7fcb2a6
+      in /lib64/ld-linux-x86-64.so.2
+    0x7ffff7fcb37c
+      in /lib64/ld-linux-x86-64.so.2
+    0x7ffff7fe3c9f
+      in /lib64/ld-linux-x86-64.so.2
+
+1.04K peak memory consumed over 20 calls from
+Allocator::SlabRegistry::InitializeArena()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1.02K consumed over 1 calls from:
+    Allocator::AllocatorEngine::AllocatorEngine(unsigned long, unsigned long)
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+16B consumed over 1 calls from:
+    Allocator::AllocatorEngine::AllocatorEngine(unsigned long, unsigned long)
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 15 other places
+
+1.02K peak memory consumed over 1 calls from
+_IO_file_doallocate
+  in /usr/lib/libc.so.6
+1.02K consumed over 1 calls from:
+    _IO_doallocbuf
+      in /usr/lib/libc.so.6
+    _IO_file_overflow
+      in /usr/lib/libc.so.6
+    _IO_file_xsputn
+      in /usr/lib/libc.so.6
+    puts
+      in /usr/lib/libc.so.6
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+120B peak memory consumed over 6 calls from
+void std::vector<>::_M_realloc_append<>(BenchResult&&)
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+120B consumed over 1 calls from:
+    BenchResult& std::vector<>::emplace_back<>(BenchResult&&)
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    Record(char const*, char const*, long, long, unsigned long, char const*)
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+36B peak memory consumed over 43 calls from
+Record(char const*, char const*, long, long, unsigned long, char const*)
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+19B consumed over 1 calls from:
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+17B consumed over 1 calls from:
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 32 other places
+
+32B peak memory consumed over 248 calls from
+__cxa_thread_atexit_impl
+  in /usr/lib/libc.so.6
+32B consumed over 1 calls from:
+    __cxa_thread_atexit
+      in /usr/lib/libstdc++.so.6
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 0B from 4 other places
+
+8B peak memory consumed over 5 calls from
+Allocator::LinearStrategyModule<>::RegisterThreadContext(Allocator::LinearStrategyModule<>::ThreadLocalData*)
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8B consumed over 1 calls from:
+    BenchThroughput()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+
+MOST TEMPORARY ALLOCATIONS
+2838568 temporary allocations of 2924572 allocations in total (97.06%) from
+BenchChurn()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+202753 temporary allocations of 204800 allocations in total (99.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+202753 temporary allocations of 204800 allocations in total (99.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+202753 temporary allocations of 204800 allocations in total (99.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+202753 temporary allocations of 204800 allocations in total (99.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+202753 temporary allocations of 204800 allocations in total (99.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 1.82M from 39 other places
+
+443611 temporary allocations of 7630002 allocations in total (5.81%) from
+BenchGameSim()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+443611 temporary allocations of 448000 allocations in total (99.02%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+
+351259 temporary allocations of 745514 allocations in total (47.12%) from
+BenchFragmentation()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50177 temporary allocations of 51200 allocations in total (98.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50177 temporary allocations of 51200 allocations in total (98.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50177 temporary allocations of 51200 allocations in total (98.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50177 temporary allocations of 51200 allocations in total (98.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+50177 temporary allocations of 51200 allocations in total (98.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 100.37K from 25 other places
+
+14000 temporary allocations of 105000014 allocations in total (0.01%) from
+BenchReset()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1000 temporary allocations of 10000000 allocations in total (0.01%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1000 temporary allocations of 10000000 allocations in total (0.01%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1000 temporary allocations of 5000000 allocations in total (0.02%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1000 temporary allocations of 5000000 allocations in total (0.02%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1000 temporary allocations of 5000000 allocations in total (0.02%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 9.00K from 23 other places
+
+8075 temporary allocations of 4200210 allocations in total (0.19%) from
+std::thread::_State_impl<>::_M_run()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+8075 temporary allocations of 4200000 allocations in total (0.19%) from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+
+1452 temporary allocations of 640016 allocations in total (0.23%) from
+std::thread::_State_impl<>::_M_run()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1452 temporary allocations of 640000 allocations in total (0.23%) from:
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+
+77 temporary allocations of 58691661 allocations in total (0.00%) from
+BenchSizeSweep()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+11 temporary allocations of 8384512 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+11 temporary allocations of 8384512 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+11 temporary allocations of 8384512 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+11 temporary allocations of 8384512 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+11 temporary allocations of 8384512 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 22B from 9 other places
+
+28 temporary allocations of 5600029 allocations in total (0.00%) from
+BenchThroughput()
+  in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 temporary allocations of 200000 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 temporary allocations of 200000 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 temporary allocations of 200000 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 temporary allocations of 200000 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+1 temporary allocations of 200000 allocations in total (0.00%) from:
+    main
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+  and 23B from 52 other places
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+0x7ffff7cae0ef
+  in /usr/lib/libstdc++.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    0x7ffff7fcb2a6
+      in /lib64/ld-linux-x86-64.so.2
+    0x7ffff7fcb37c
+      in /lib64/ld-linux-x86-64.so.2
+    0x7ffff7fe3c9f
+      in /lib64/ld-linux-x86-64.so.2
+
+1 temporary allocations of 248 allocations in total (0.40%) from
+__cxa_thread_atexit_impl
+  in /usr/lib/libc.so.6
+1 temporary allocations of 210 allocations in total (0.48%) from:
+    __cxa_thread_atexit
+      in /usr/lib/libstdc++.so.6
+    std::thread::_State_impl<>::_M_run()
+      in /home/inconceivable/DevAndResearch/Programming/Projects/Personal/C++/Custom_Memory_Allocator/build/release/allocator_benchmark
+    0x7ffff7ce55a3
+      in /usr/lib/libstdc++.so.6
+    0x7ffff7987979
+      in /usr/lib/libc.so.6
+    0x7ffff7a0b2bb
+      in /usr/lib/libc.so.6
+  and 0B from 4 other places
+
+
+total runtime: 55.80s.
+calls to allocation functions: 185521309 (3324873/s)
+temporary memory allocations: 3657074 (65541/s)
+peak heap memory consumption: 121.38M
+peak RSS (including heaptrack overhead): 192.61M
+total memory leaked: 2.43K
