@@ -1,28 +1,34 @@
 flowchart TD
-    Start([User Calls Allocate<TScope>]) --> Traits{ScopeTraits<TScope>::SupportsHandles?}
+    Start([User Calls Allocate / AllocateWithHandle]) --> Traits{ScopeTraits<TScope>}
     
-    subgraph "Branching Logic"
-    Traits -- NO (Linear Scope) --> LinearPath
-    Traits -- YES (Pool Scope) --> PoolPath
+    subgraph "Compile-Time Branching (Zero Runtime Cost)"
+        Traits -- "IsPool == false\nSupportsHandles == false" --> LinearPath
+        Traits -- "IsPool == true\nSupportsHandles == true" --> PoolPath
     end
 
-    subgraph "Linear Path"
-        LinearPath[RawAllocateInternal]
+    subgraph "Linear Path (Fast Bump)"
+        LinearPath[RawAllocateInternal<TScope>]
         LinearPath --> CallLinear[LinearStrategyModule::Allocate]
-        CallLinear --> LinearReturn([Return void*])
+        CallLinear --> LinearReturn([Return void* Raw Pointer])
     end
 
-    subgraph "Pool Path"
-        PoolPath[AllocateWithHandle]
-        PoolPath --> CallPool[PoolModule::Allocate]
+    subgraph "Pool Path (Thread-Local Cache + Handles)"
+        PoolPath[RawAllocateInternal<PoolScope<T>>]
+        PoolPath --> ResolveBucket[PoolMap resolves to BucketScope<N>]
+        ResolveBucket --> CallPool[PoolModule<BucketScope<N>>::Allocate]
         
         CallPool --> CheckPoolResult{Memory Valid?}
-        CheckPoolResult -- No --> RetInvalid([Return InvalidHandle])
+        CheckPoolResult -- No (OOM) --> RetInvalid([Return g_InvalidHandle])
         CheckPoolResult -- Yes --> CreateHandle[HandleTable::Allocate]
-        CreateHandle --> PoolReturn([Return Handle])
+        
+        CreateHandle --> HT_ShardHash[Hash Thread ID % 32]
+        HT_ShardHash --> HT_AllocateRaw[Shard::AllocateRaw]
+        HT_AllocateRaw --> PoolReturn([Return 64-bit Packed Handle])
     end
     
-    subgraph "Resolve Path"
-        UserResolve([User Calls ResolveHandle]) --> ResolveCall[HandleTable::Resolve]
-        ResolveCall --> RetPtr([Return T*])
+    subgraph "Seqlock Resolve Path"
+        UserResolve([User Calls ResolveHandle]) --> DecodeBits[Decode 5-bit Shard, 27-bit Index]
+        DecodeBits --> CheckSeqLock{Handle.Gen == Metadata.Gen?}
+        CheckSeqLock -- No (Stale/Odd) --> RetNull([Return nullptr])
+        CheckSeqLock -- Yes --> RetPtr([Return Cast T*])
     end

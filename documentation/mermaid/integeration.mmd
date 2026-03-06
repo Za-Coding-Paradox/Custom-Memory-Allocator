@@ -1,0 +1,75 @@
+flowchart TB
+    classDef osLayer fill:#2d3436,stroke:#636e72,color:#fff
+    classDef sharedMem fill:#0984e3,stroke:#74b9ff,color:#fff
+    classDef tlsMem fill:#00b894,stroke:#55efc4,color:#fff
+    classDef cpuCore fill:#e17055,stroke:#fab1a0,color:#fff
+    
+    subgraph "Linux OS and Hardware Layer"
+        MMAP["mmap syscall MAP_ANONYMOUS"]
+        PF["do_anonymous_page\nDemand Zeroing Handler"]
+        RAM[("Physical RAM NUMA Node 0")]
+        
+        MMAP -->|"Pre-faulted via memset"| PF
+        PF -.->|"Mapped Pages"| RAM
+    end
+
+    subgraph "Process Virtual Address Space"
+        direction LR
+        
+        subgraph "Allocator Shared Memory Heap"
+            Engine["AllocatorEngine Base"]
+            
+            subgraph "SlabRegistry Arena"
+                Bitmap["m_BitMap and m_SuperBlock\n130x uint64_t"]
+                Arena["Contiguous Virtual Arena\n8192x 64KB Slabs"]
+                Bitmap -.->|"Bit represents Slab"| Arena
+            end
+            
+            subgraph "HandleTable Directory"
+                Shards["32x HandleTableShard"]
+                Pages["65536 Lazy Pages per Shard"]
+                Shards --> Pages
+            end
+            
+            Engine --> Bitmap
+            Engine --> Shards
+        end
+        
+        subgraph "Thread Execution Environment"
+            direction TB
+            subgraph "CPU Core 0"
+                L1_0["L1 Cache Hit"]
+                TLS_0["Module ThreadLocalData\nalignas 64 bytes"]
+                L1_0 --- TLS_0
+            end
+            
+            subgraph "CPU Core N"
+                L1_N["L1 Cache Hit"]
+                TLS_N["Module ThreadLocalData\nalignas 64 bytes"]
+                L1_N --- TLS_N
+            end
+        end
+    end
+
+    %% Cross-boundary interactions
+    Arena ===|"mmap backing"| MMAP
+    
+    %% Fast path isolation
+    TLS_0 -.->|"MESI Isolated"| TLS_N
+    
+    %% Slow path interactions
+    TLS_0 ==>|"GrowSlabChain Mutex Contention"| Bitmap
+    TLS_N ==>|"GrowSlabChain Mutex Contention"| Bitmap
+    
+    L1_0 ==>|"Hash modulo 32 = Shard X"| Shards
+    L1_N ==>|"Hash modulo 32 = Shard Y"| Shards
+    
+    %% Annotations
+    note1>"Pre-faulting bypasses 1.5 microsec OS page-fault overhead per 4KB chunk"]
+    PF -.- note1
+
+    %% Safe Class Assignments
+    class MMAP,PF,RAM osLayer;
+    class Engine,Bitmap,Arena,Shards,Pages sharedMem;
+    class TLS_0,TLS_N tlsMem;
+    class L1_0,L1_N cpuCore;

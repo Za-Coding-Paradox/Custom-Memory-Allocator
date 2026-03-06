@@ -1,0 +1,82 @@
+
+╔══════════════════════════════════════════════════════════════╗
+║  CUSTOM ALLOCATOR vs malloc  —  Full Benchmark Suite         ║
+║  Arena: 512MB | Slab: 64KB | Median of 7 runs per bench      ║
+╚══════════════════════════════════════════════════════════════╝
+
+  I.    Throughput...
+  [TRACE] === BenchThroughput start ===
+  [TRACE] Linear 64B ─────────────────────────────────────────────────
+  [TRACE] Pool 64B alloc+free ────────────────────────────────────────
+  II.   Churn...
+  [TRACE] === BenchChurn start ===
+  [TRACE] 128B ───────────────────────────────────────────────────────
+  III.  Size sweep...
+  [TRACE] === BenchSizeSweep start ===
+  IV.   Cache coherency...
+  [TRACE] === BenchCacheCoherency start ===
+  V.    Fragmentation...
+  [TRACE] === BenchFragmentation start ===
+  [TRACE] Same-size 128B ─────────────────────────────────────────────
+  VI.   Concurrency...
+  [TRACE] === BenchConcurrency start ===
+  VII.  Reset / Rewind...
+  [TRACE] === BenchReset start ===
+  [TRACE] FrameLoad: bump alloc N + Reset ────────────────────────────
+  VIII. Handle resolution...
+  [TRACE] === BenchHandleResolution start ===
+  IX.   Game simulation...
+  [TRACE] === BenchGameSim start ===
+  X.    False-sharing probe...
+  [TRACE] === BenchFalseSharing start ===
+
+[X. False-Sharing Probe — 16 threads, 100K bump allocs each]
+  Custom: avg=182µs  min=178µs  max=206µs  spread=15.4%
+  malloc: avg=36786µs  min=11225µs  max=66997µs  spread=151.6%
+  >> PASS: single cluster, spread=15.4%. TLS padding correct.
+
+-------------------------------------------------------------------------------------------------------------------
+DOMAIN              BENCHMARK                         CUSTOM       MALLOC       SPEEDUP  VERDICT   NOTES
+-------------------------------------------------------------------------------------------------------------------
+I. Throughput       Linear alloc 64B                  4.93 ns/op   67.21 ns/op  13.64x   FASTER    no free, O(1) bump
+I. Throughput       Linear alloc 512B                 5.03 ns/op   281.58 ns/op 55.99x   FASTER    no free, O(1) bump
+I. Throughput       Pool alloc+free 64B               26.25 ns/op  34.74 ns/op  1.32x    FASTER    full cycle, CAS freelist
+I. Throughput       Pool alloc+free 256B              39.09 ns/op  85.36 ns/op  2.18x    FASTER    full cycle, CAS freelist
+
+II. Churn           Pool 128B 50% churn               27.64 ns/op  4.63 ns/op   0.17x    SLOWER    checkerboard free/realloc
+II. Churn           Pool 32B 50% churn                26.00 ns/op  3.98 ns/op   0.15x    SLOWER    small bucket recycling
+
+III. Size Sweep     Linear 16B                        5.18 ns/op   44.50 ns/op  8.58x    FASTER    N=4194304
+III. Size Sweep     Linear 32B                        4.85 ns/op   49.44 ns/op  10.20x   FASTER    N=2097152
+III. Size Sweep     Linear 64B                        4.68 ns/op   61.20 ns/op  13.09x   FASTER    N=1048576
+III. Size Sweep     Linear 128B                       4.68 ns/op   89.15 ns/op  19.04x   FASTER    N=524288
+III. Size Sweep     Linear 256B                       4.71 ns/op   153.85 ns/op 32.68x   FASTER    N=262144
+III. Size Sweep     Linear 512B                       4.78 ns/op   253.44 ns/op 52.97x   FASTER    N=131072
+III. Size Sweep     Linear 1024B                      5.17 ns/op   431.50 ns/op 83.43x   FASTER    N=65536
+III. Size Sweep     Linear 2048B                      5.11 ns/op   810.33 ns/op 158.67x  FASTER    N=32768
+III. Size Sweep     Linear 4096B                      5.59 ns/op   1503.62 ns/op269.05x  FASTER    N=16384
+III. Size Sweep     Linear 8192B                      5.81 ns/op   1483.47 ns/op255.13x  FASTER    N=8192
+III. Size Sweep     Linear 16384B                     6.99 ns/op   1412.15 ns/op201.99x  FASTER    N=4096
+
+IV. Cache           Seq scan 64B x16K                 1.96 ns/op   2.03 ns/op   1.03x    PAR       contiguous slab vs scattered heap
+IV. Cache           Strided scan stride=8             2.64 ns/op   2.67 ns/op   1.01x    PAR       probes TLB + prefetch distance
+IV. Cache           Pool resolve+read 64B             3.39 ns/op   1.90 ns/op   0.56x    SLOWER    handle table seqlock overhead
+
+V. Fragmentation    Same-size 128B checker            26.29 ns/op  3.72 ns/op   0.14x    SLOWER    50% free+realloc per cycle
+V. Fragmentation    Mixed 32B+256B interleaved        26.51 ns/op  5.07 ns/op   0.19x    SLOWER    separate buckets vs heap coalesce
+
+VI. Concurrency     Pool 128B 2 threads               26.91 ns/op  24.48 ns/op  0.91x    PAR       2 threads x 20000 ops
+VI. Concurrency     Pool 128B 4 threads               27.05 ns/op  26.15 ns/op  0.97x    PAR       4 threads x 20000 ops
+VI. Concurrency     Pool 128B 8 threads               28.44 ns/op  25.01 ns/op  0.88x    SLOWER    8 threads x 20000 ops
+VI. Concurrency     Pool 128B 16 threads              27.58 ns/op  24.95 ns/op  0.90x    PAR       16 threads x 20000 ops
+
+VII. Reset          Frame alloc+Reset 1K frames       4.43 ns/op   46.65 ns/op  10.53x   FASTER    Reset=O(1) vs N x free()
+VII. Reset          LevelLoad rewind 5K/frame         4.90 ns/op   47.10 ns/op  9.61x    FASTER    marker save+rewind vs N x free()
+
+VIII. Handles       Handle resolve 2M ops             4.19 ns/op   1.60 ns/op   0.38x    SLOWER    vs raw ptr deref
+
+IX. Game Sim        2K frame mixed loop               7.25 ns/op   39.21 ns/op  5.41x    FASTER    scratch+pool+reset
+
+X. False-Sharing    TLS isolation 16T                 4.55 ns/op   919.65 ns/op 202.12x  FASTER    custom spread=15%  malloc spread=152%
+-------------------------------------------------------------------------------------------------------------------
+

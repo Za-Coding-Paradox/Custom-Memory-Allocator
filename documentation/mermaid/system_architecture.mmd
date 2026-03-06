@@ -1,60 +1,58 @@
 graph TD
-    subgraph "Client Layer"
-        UserApp[User Application]
-        UserApp -->|1. Request Memory| Engine[AllocatorEngine]
-        UserApp -->|2. Resolve Handle| Engine
-        UserApp -->|3. Free Handle| Engine
+    subgraph "User Application Layer"
+        App[Game Simulation / Application]
+        App -->|1. Allocate<FrameLoad>| Facade
+        App -->|2. AllocateWithHandle<RigidBody>| Facade
+        App -->|3. Reset<FrameLoad>| Facade
     end
 
     subgraph "Facade Layer"
-        Engine
-        Traits[ScopeTraits<TScope>]
-        Engine -.->|Check Traits| Traits
+        Facade[AllocatorEngine]
+        Traits[ScopeTraits C++20 Requires]
+        Facade -.->|Compile-Time Branching| Traits
     end
 
-    subgraph "Strategy Layer (Thread-Local)"
+    subgraph "Strategy Layer (Isolated Threads)"
         direction TB
         
-        subgraph "Linear Allocator (Per-Frame/Level)"
-            LinearMod[LinearStrategyModule]
-            LinearTLS[TLS Context]
-            LinearMod -- Access --> LinearTLS
-            LinearTLS -- Holds --> LinearChain[Active Slab Chain]
+        subgraph "Linear (Bump Pointer)"
+            LinMod[LinearStrategyModule<TScope>]
+            LinTLS[alignas 64 ThreadLocalData]
+            LinMod -- Zero-Contention Access --> LinTLS
         end
         
-        subgraph "Pool Allocator (Long-Lived)"
-            PoolMod[PoolModule]
-            PoolTLS[TLS Context]
-            PoolMod -- Access --> PoolTLS
-            PoolTLS -- Holds --> PoolChain[Active Slab Chain]
+        subgraph "Pool (Fixed Size Buckets)"
+            PoolMod[PoolModule<BucketScope<N>>]
+            PoolTLS[alignas 64 ThreadLocalData]
+            PoolMod -- Fast Path Access --> PoolTLS
             
-            %% Optimization Visualized
-            PoolTLS -- Optimization --> Cursor[g_FirstNonFullSlab]
+            PoolCAS[Global atomic void* CAS Freelist]
+            PoolMod -- Slow Path Free --> PoolCAS
         end
     end
 
-    subgraph "Safety Layer"
-        HandleSys[HandleSystem]
-        HandleTable[HandleTable]
-        HandleSys -- Manages --> HandleTable
-        HandleTable -- Maps ID to Ptr --> PhysicalMem
+    subgraph "Handle System (Safety)"
+        HT[HandleTable]
+        Shards[32x HandleTableShard]
+        HT -- Hashed by Thread ID --> Shards
+        Shards -- Seqlock Generation Array --> Meta[HandleMetadata]
     end
 
-    subgraph "Physical Layer (Shared)"
-        Registry[SlabRegistry]
-        Bitmap[Atomic Bitmap]
-        Arena[64MB Monolithic Arena]
+    subgraph "Physical Layer (Linux OS Environment)"
+        Reg[SlabRegistry]
+        Super[atomic m_SuperBlock Two-Level Bitmap]
+        Arena[512MB Contiguous pre-faulted mmap Arena]
         
-        Registry -- Scans --> Bitmap
-        Registry -- Slices --> Arena
+        Reg -- O(1) PopCnt Scan --> Super
+        Reg -- Partitions 64KB Slabs --> Arena
     end
 
-    %% Interactions
-    Engine -->|Linear Scope| LinearMod
-    Engine -->|Pool Scope| PoolMod
-    Engine -->|Handle Request| HandleSys
+    %% Edge Links
+    Facade -->|Traits Route| LinMod
+    Facade -->|Traits Route| PoolMod
+    Facade -->|Pool Wraps| HT
     
-    LinearMod -->|Request Slab| Registry
-    PoolMod -->|Request Slab| Registry
+    LinMod -->|SlowPath Batch Fetch| Reg
+    PoolMod -->|SlowPath Batch Fetch| Reg
     
-    HandleSys -.->|Resolve| PoolMod
+    HT -.->|Resolves Ptr| Arena

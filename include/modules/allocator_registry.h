@@ -1,8 +1,4 @@
 #pragma once
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <span>
 #include <utilities/allocator_utility.h>
 
 namespace Allocator {
@@ -26,7 +22,7 @@ class SlabDescriptor
 {
 private:
     uintptr_t m_SlabStart;
-    uintptr_t m_FreeListHead;
+    std::atomic<uintptr_t> m_FreeListHead;
     SlabDescriptor* m_NextSlab;
     size_t m_ActiveSlots;
     size_t m_TotalSlots;
@@ -43,7 +39,7 @@ public:
 
     inline void UpdateFreeListHead(uintptr_t FreeListHead) noexcept
     {
-        m_FreeListHead = FreeListHead;
+        m_FreeListHead.store(FreeListHead, std::memory_order_relaxed);
     }
     inline void IncrementActiveSlots() noexcept { m_ActiveSlots++; }
     inline void SetActiveSlots(size_t ActiveSlots) noexcept { m_ActiveSlots = ActiveSlots; }
@@ -51,7 +47,14 @@ public:
     inline void SetTotalSlots(size_t TotalSlots) noexcept { m_TotalSlots = TotalSlots; }
 
     [[nodiscard]] inline uintptr_t GetSlabStart() const noexcept { return m_SlabStart; }
-    [[nodiscard]] inline uintptr_t GetFreeListHead() const noexcept { return m_FreeListHead; }
+    [[nodiscard]] inline uintptr_t GetFreeListHead() const noexcept
+    {
+        return m_FreeListHead.load(std::memory_order_relaxed);
+    }
+    [[nodiscard]] inline std::atomic<uintptr_t>& GetFreeListHeadAtomic() noexcept
+    {
+        return m_FreeListHead;
+    }
     [[nodiscard]] inline size_t GetActiveSlots() const noexcept { return m_ActiveSlots; }
     [[nodiscard]] inline size_t GetTotalSlots() const noexcept { return m_TotalSlots; }
     [[nodiscard]] inline size_t GetAvailableMemorySize() const noexcept
@@ -93,6 +96,7 @@ public:
     SlabRegistry& operator=(const SlabRegistry&) = delete;
 
     [[nodiscard]] SlabDescriptor* AllocateSlab() noexcept;
+    size_t AllocateSlabBatch(size_t RequestCount, SlabDescriptor** OutSlabs) noexcept;
     void FreeSlab(SlabDescriptor* SlabToFree) noexcept;
 
     [[nodiscard]] SlabDescriptor* GetSlabDescriptor(void* Ptr) const noexcept;

@@ -50,11 +50,14 @@ inline constexpr Handle g_InvalidHandle = Handle();
 
 struct HandleMetadata
 {
-    void* Pointer;
-    uint32_t Generation;
+    std::atomic<void*> Pointer;
+    std::atomic<uint32_t> Generation;
     uint32_t NextFree;
 
     HandleMetadata() noexcept : Pointer(nullptr), Generation(1), NextFree(0) {}
+
+    HandleMetadata(const HandleMetadata&) = delete;
+    HandleMetadata& operator=(const HandleMetadata&) = delete;
 };
 
 class alignas(64) HandleTableShard
@@ -65,13 +68,15 @@ private:
     static constexpr uint32_t g_ElementsPerPage = 1024;
     static constexpr uint32_t g_MaxPages = 65536;
     static constexpr uint32_t g_FreeListEnd = 0xFFFFFFFF;
-    static constexpr uint32_t g_PageShift = 10;
+    static constexpr uint32_t g_PageShift = 10; // log2(g_ElementsPerPage)
     static constexpr uint32_t g_PageMask = g_ElementsPerPage - 1;
 
     std::array<std::atomic<HandleMetadata*>, g_MaxPages> m_Pages;
 
-    alignas(64) std::atomic<uint32_t> m_FreeListHead;
+    alignas(64) std::atomic<uint64_t> m_TaggedHead;
+
     alignas(64) std::atomic<uint32_t> m_ActiveCount;
+
     alignas(64) std::atomic<uint32_t> m_Capacity;
 
     mutable std::mutex m_GrowthMutex;
@@ -85,6 +90,19 @@ private:
 
     bool GrowCapacity() noexcept;
 
+    static constexpr uint64_t PackHead(uint32_t Index, uint32_t Tag) noexcept
+    {
+        return (static_cast<uint64_t>(Tag) << 32) | static_cast<uint64_t>(Index);
+    }
+    static constexpr uint32_t HeadIndex(uint64_t Packed) noexcept
+    {
+        return static_cast<uint32_t>(Packed);
+    }
+    static constexpr uint32_t HeadTag(uint64_t Packed) noexcept
+    {
+        return static_cast<uint32_t>(Packed >> 32);
+    }
+
 public:
     explicit HandleTableShard() noexcept;
     ~HandleTableShard() noexcept;
@@ -97,6 +115,11 @@ public:
     [[nodiscard]] uint32_t GetActiveCount() const noexcept
     {
         return m_ActiveCount.load(std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] uint32_t GetCapacity() const noexcept
+    {
+        return m_Capacity.load(std::memory_order_relaxed);
     }
 };
 

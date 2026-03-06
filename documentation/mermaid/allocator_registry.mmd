@@ -1,32 +1,34 @@
 flowchart TD
     subgraph "Initialization Phase"
-        Mmap[mmap 64MB] --> Split["Split: Headers | Payload"]
-        Split --> InitBitmap[Init Atomic Bitmap]
+        Mmap[mmap MAP_ANONYMOUS\nArenaSize defaults 512MB] --> PreFault[Pre-fault all pages via memset]
+        PreFault --> InitBitmap[Init Two-Level Atomic Bitmap:\nm_BitMap & m_SuperBlock]
     end
 
     subgraph "Allocation Logic (AllocateSlab)"
-        StartAlloc([Request Slab]) --> LoadHint[Load m_SearchHint]
-        LoadHint --> Loop[Scan Bitmap Atomic]
+        StartAlloc([Request Slab]) --> LoadHint[Load atomic m_SearchHint]
+        LoadHint --> CheckSuper[Read m_SuperBlock at Hint/64]
         
-        Loop --> FoundFree{Found 0-bit?}
-        FoundFree -- No --> IncIndex[Increment Index]
-        IncIndex --> CheckWrap{Wrapped Around?}
-        CheckWrap -- No --> Loop
-        CheckWrap -- Yes --> Fail([Return nullptr])
+        CheckSuper --> FoundBlock{SuperBlock != 0?}
+        FoundBlock -- No --> IncHint[Linear scan next SuperBlock] --> CheckSuper
         
-        FoundFree -- Yes --> CAS{CompareExchange?}
-        CAS -- Fail --> Loop
-        CAS -- Success --> Claim[Mark Bit 1]
+        FoundBlock -- Yes --> PopCnt[POPCNT / ffs to find first 1-bit in Block]
+        PopCnt --> ReadMap[Read corresponding m_BitMap uint64_t]
+        ReadMap --> FindExact[Isolate exact 0-bit for Slab]
         
-        Claim --> UpdateHint[Update m_SearchHint]
-        UpdateHint --> Launder[std::launder Descriptor]
-        Launder --> ResetDesc[Descriptor->Reset]
-        ResetDesc --> ReturnSlab([Return SlabDescriptor*])
+        FindExact --> CAS{CAS m_BitMap Bit 1 -> 0}
+        CAS -- Fail (Race) --> ReadMap
+        CAS -- Success --> BlockEmpty{Was it the last bit in SuperBlock?}
+        
+        BlockEmpty -- Yes --> CasSuper[CAS m_SuperBlock Bit 1 -> 0] --> Claim
+        BlockEmpty -- No --> Claim[Update m_SearchHint]
+        
+        Claim --> CalcAddr[Compute Physical Address via Index]
+        CalcAddr --> InitDesc[Format Intrusive SlabDescriptor]
+        InitDesc --> ReturnSlab([Return SlabDescriptor*])
     end
 
     subgraph "Memory Layout"
         direction LR
-        DescRegion[Region 1: SlabDescriptors]
-        Padding[Alignment Padding]
-        SlabRegion[Region 2: 64KB Slab Payloads]
+        RegistryStart[m_ArenaRegistryStart\nBitmap Arrays] --> ArenaStart
+        ArenaStart[m_ArenaSlabsStart\nPre-faulted 64KB Slabs]
     end

@@ -39,8 +39,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/tests.cpp")
 endif()
 
 # Executable 2: The Benchmarks
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/benchmarks.cpp")
-    add_executable(allocator_benchmark tests/benchmarks.cpp)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/benchmarks.cpp")
+    add_executable(allocator_benchmark benchmarks/benchmarks.cpp)
     target_link_libraries(allocator_benchmark 
         PRIVATE 
         allocator 

@@ -11,31 +11,66 @@ std::atomic<SlabRegistry*> LinearStrategyModule<TContext>::g_SlabRegistry{nullpt
 template <typename TContext> ContextStats LinearStrategyModule<TContext>::g_GlobalStats;
 template <typename TContext> std::mutex LinearStrategyModule<TContext>::g_ContextMutex;
 template <typename TContext>
-std::vector<SlabDescriptor**> LinearStrategyModule<TContext>::g_ThreadHeads;
+std::vector<typename LinearStrategyModule<TContext>::ThreadLocalData*>
+    LinearStrategyModule<TContext>::g_ThreadHeads;
 
 template <typename TContext>
 void* LinearStrategyModule<TContext>::OverFlowAllocate(size_t AllocationSize,
                                                        size_t AllocationAlignment) noexcept
 {
-    auto& tls = GetTLS();
-    SlabDescriptor* OldSlab = tls.ActiveSlab;
-    SlabDescriptor* NextSlab = OldSlab->GetNextSlab();
-
-    if (NextSlab != nullptr) {
-        tls.ActiveSlab = NextSlab;
-        NextSlab = tls.ActiveSlab->GetNextSlab();
-        LinearStrategy::Reset(*tls.ActiveSlab);
-        tls.ActiveSlab->SetNextSlab(NextSlab);
-        return Allocate(AllocationSize, AllocationAlignment);
-    }
-
-    GrowSlabChain();
-
-    if (tls.ActiveSlab == OldSlab) [[unlikely]] {
+    if (AllocationSize > g_ConstSlabSize) [[unlikely]] {
+        LOG_ALLOCATOR("ERROR", "[L-OVERFLOW] AllocationSize "
+                                   << AllocationSize << " exceeds SlabSize. Cannot satisfy.");
         return nullptr;
     }
 
-    return (tls.ActiveSlab != nullptr) ? Allocate(AllocationSize, AllocationAlignment) : nullptr;
+    auto& tls = GetTLS();
+
+    static constexpr int kMaxAdvances = 4;
+
+    for (int Attempt = 0; Attempt < kMaxAdvances; ++Attempt) {
+        SlabDescriptor* NextSlab = tls.ActiveSlab->GetNextSlab();
+
+        if (NextSlab != nullptr) {
+            LOG_ALLOCATOR("DEBUG", "[L-OVERFLOW] Attempt "
+                                       << Attempt << ": Advancing to existing slab " << NextSlab);
+            NextSlab->UpdateFreeListHead(NextSlab->GetSlabStart());
+            tls.ActiveSlab = NextSlab;
+        }
+        else {
+            LOG_ALLOCATOR("DEBUG", "[L-OVERFLOW] Attempt "
+                                       << Attempt << ": Chain exhausted. Calling GrowSlabChain.");
+            SlabDescriptor* const OldActive = tls.ActiveSlab;
+            GrowSlabChain();
+
+            if (tls.ActiveSlab == OldActive) [[unlikely]] {
+                LOG_ALLOCATOR("CRITICAL",
+                              "[L-OVERFLOW] GrowSlabChain failed to produce a new slab. OOM.");
+                return nullptr;
+            }
+        }
+
+        if (LinearStrategy::CanFit(*tls.ActiveSlab, AllocationSize, AllocationAlignment)) {
+            void* Result =
+                LinearStrategy::Allocate(*tls.ActiveSlab, AllocationSize, AllocationAlignment);
+
+            if (Result != nullptr) [[likely]] {
+                LOG_ALLOCATOR("DEBUG", "[L-OVERFLOW] Satisfied after "
+                                           << Attempt + 1 << " advance(s). Ptr: " << Result);
+                return Result;
+            }
+        }
+
+        LOG_ALLOCATOR("WARN", "[L-OVERFLOW] Slab " << tls.ActiveSlab << " still cannot fit "
+                                                   << AllocationSize
+                                                   << "B @ align=" << AllocationAlignment
+                                                   << " (alignment waste). Advancing again.");
+    }
+
+    LOG_ALLOCATOR("ERROR", "[L-OVERFLOW] Exhausted "
+                               << kMaxAdvances << " slab advances for " << AllocationSize
+                               << "B @ align=" << AllocationAlignment << ". Returning nullptr.");
+    return nullptr;
 }
 
 template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain() noexcept
@@ -57,7 +92,7 @@ template <typename TContext> void LinearStrategyModule<TContext>::GrowSlabChain(
     if (!tls.HeadSlab) {
         tls.HeadSlab = NewSlab;
         tls.ActiveSlab = NewSlab;
-        RegisterThreadContext(&tls.HeadSlab);
+        RegisterThreadContext(&tls);
     }
     else {
         tls.ActiveSlab->SetNextSlab(NewSlab);
@@ -82,7 +117,7 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownModule
 
     SlabRegistry* Registry = g_SlabRegistry.load(std::memory_order_acquire);
 
-    UnregisterThreadContext(&tls.HeadSlab);
+    UnregisterThreadContext(&tls);
 
     SlabDescriptor* Current = tls.HeadSlab;
     while (Current) {
@@ -101,16 +136,19 @@ template <typename TContext> void LinearStrategyModule<TContext>::ShutdownSystem
         return;
 
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    for (SlabDescriptor** HeadPtr : g_ThreadHeads) {
-        if (HeadPtr && *HeadPtr) {
-            SlabDescriptor* Current = *HeadPtr;
-            while (Current) {
-                SlabDescriptor* Next = Current->GetNextSlab();
-                Registry->FreeSlab(Current);
-                Current = Next;
-            }
-            *HeadPtr = nullptr;
+    for (ThreadLocalData* TLSEntry : g_ThreadHeads) {
+        if (!TLSEntry)
+            continue;
+
+        SlabDescriptor* Current = TLSEntry->HeadSlab;
+        while (Current) {
+            SlabDescriptor* Next = Current->GetNextSlab();
+            Registry->FreeSlab(Current);
+            Current = Next;
         }
+
+        TLSEntry->HeadSlab = nullptr;
+        TLSEntry->ActiveSlab = nullptr;
     }
     g_ThreadHeads.clear();
 }
@@ -135,18 +173,17 @@ void LinearStrategyModule<TContext>::Reset() noexcept
 }
 
 template <typename TContext>
-void LinearStrategyModule<TContext>::RegisterThreadContext(SlabDescriptor** ThreadHeadPtr) noexcept
+void LinearStrategyModule<TContext>::RegisterThreadContext(ThreadLocalData* TLS) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    g_ThreadHeads.push_back(ThreadHeadPtr);
+    g_ThreadHeads.push_back(TLS);
 }
 
 template <typename TContext>
-void LinearStrategyModule<TContext>::UnregisterThreadContext(
-    SlabDescriptor** ThreadHeadPtr) noexcept
+void LinearStrategyModule<TContext>::UnregisterThreadContext(ThreadLocalData* TLS) noexcept
 {
     std::lock_guard<std::mutex> Lock(g_ContextMutex);
-    std::erase(g_ThreadHeads, ThreadHeadPtr);
+    std::erase(g_ThreadHeads, TLS);
 }
 
 template <typename TContext>

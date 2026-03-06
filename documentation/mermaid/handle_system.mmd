@@ -1,30 +1,47 @@
 classDiagram
     class Handle {
-        +uint32 Index
-        +uint32 Generation
-        +GetPacked() uint64
+        <<Packed 64-bit Struct>>
+        -uint64_t m_Packed
+        +GetIndex() uint32_t (27 bits)
+        +GetGeneration() uint32_t (32 bits)
+        +GetShardID() uint8_t (5 bits)
+        +IsValid() bool
     }
 
     class HandleTable {
-        -atomic_uint32 m_FreeListHead
-        -array_atomic_Page_1024 m_Pages
-        +Allocate(void* Ptr) Handle
-        +Resolve(Handle) void*
-        +Free(Handle) bool
+        <<16.78MB Array>>
+        -array~HandleTableShard, 32~ m_Shards
+        +Allocate(void* Pointer) Handle
+        +Resolve(Handle H) void*
+        +Free(Handle H) bool
+        -GetShardIndex() size_t
     }
 
-    class HandlePage {
-        +HandleMetadata Entries[1024]
+    class ShardCache {
+        <<thread_local alignas(64)>>
+        +size_t Index : hash(thread_id) % 32
+    }
+
+    class HandleTableShard {
+        <<alignas(64) Mutex-Guarded Directory>>
+        -array~atomic_HandleMetadata_ptr, 65536~ m_Pages
+        -atomic_uint64_t m_TaggedHead
+        -atomic_uint32_t m_ActiveCount
+        +AllocateRaw(void*) ShardAllocResult
+        +ResolveRaw(Index, Gen) void*
     }
 
     class HandleMetadata {
-        +void* Pointer
-        +uint32 Generation
-        +uint32 NextFree
+        <<16-Byte Seqlock Payload>>
+        +atomic~void*~ Pointer
+        +atomic~uint32_t~ Generation
+        +uint32_t NextFree
     }
 
-    HandleTable "1" *-- "1024" HandlePage : Sparse Allocation (Lazy)
-    HandlePage "1" *-- "1024" HandleMetadata : Contains
-    Handle ..> HandleTable : Access
+    HandleTable "1" *-- "32" HandleTableShard : Partitions 
+    HandleTableShard "1" *-- "65536" HandleMetadata : Paginates Metadata
+    HandleTable ..> ShardCache : Uses to bypass global locks
+    Handle ..> HandleMetadata : Seqlock Resolution
 
-    note for HandleMetadata "Generational Safety:\nIf Handle.Gen != Metadata.Gen\n-> Access Denied (Stale)"
+    note for HandleTableShard "Lazy allocation ensures only accessed pages\n(1024 entries each) are physically backed."
+    note for HandleMetadata "Generational Seqlock:\nRetry while (Gen & 1 || Gen != Reloaded)"

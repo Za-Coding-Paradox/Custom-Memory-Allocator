@@ -1,0 +1,47 @@
+flowchart TD
+    %% Node Definitions
+    App("User Game Loop\n(Requesting 2,000 mixed frames)")
+    Engine("AllocatorEngine\n(Over 16MB Heap Object)")
+    
+    subgraph TLS_Path ["Thread-Local Storage Fast Path"]
+        LinTLS("LinearModule TLS\n[alignas 64]\nActiveSlab | BumpCursor")
+        PoolTLS("PoolModule TLS\n[alignas 64]\nActiveSlab | FirstNonFull")
+        ShardCache("Handle ShardCache\n[alignas 64]\nhash modulo 32")
+    end
+    
+    subgraph Global_Path ["Global Process Memory Slow Path"]
+        Registry("SlabRegistry\n(Manages 512MB Arena)")
+        Bitmap("Two-Level Atomic Bitmap\n(m_SuperBlock to m_BitMap)")
+        HTable("HandleTable\n(32 Mutex-Guarded Shards)")
+        HMetadata("HandleMetadata Array\n(Generational Seqlocks)")
+    end
+    
+    subgraph OS_Path ["Linux OS and Hardware"]
+        Syscall("sys/mman.h\n(mmap, MAP_ANONYMOUS)")
+        RAM("Physical Memory Pages")
+    end
+
+    %% Application flow
+    App ==>|"1. Allocate FrameLoad [Cost: 4.93 ns/op]"| Engine
+    App ==>|"2. AllocateWithHandle RigidBody [Cost: 26.25 ns/op]"| Engine
+    
+    %% Engine routes to TLS
+    Engine -.->|"if constexpr IsPool == false"| LinTLS
+    Engine -.->|"if constexpr IsPool == true"| PoolTLS
+    
+    %% TLS interacts with Global
+    LinTLS -->|"BumpCursor Exhausted [GrowSlabChain]"| Registry
+    PoolTLS -->|"Slab Chain Exhausted [GrowSlabChain]"| Registry
+    PoolTLS -->|"Generates Pointer"| ShardCache
+    
+    ShardCache -->|"Indexes specific Shard"| HTable
+    HTable -->|"CAS Pointer and Incr Gen"| HMetadata
+    
+    %% Global interacts with OS
+    Registry -->|"Amortized Search"| Bitmap
+    Registry ===|"Initialize called once"| Syscall
+    Syscall -->|"Pre-faults via memset eliminating lazy zeroing"| RAM
+
+    %% Styles
+    classDef boundary fill:transparent,stroke:#bdc3c7,stroke-width:2px,stroke-dasharray: 5 5
+    class TLS_Path,Global_Path,OS_Path boundary

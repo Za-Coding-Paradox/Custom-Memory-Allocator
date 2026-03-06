@@ -1,56 +1,53 @@
 stateDiagram-v2
-    state "Thread Local Storage" as TLS {
-        ActiveSlab
+    state "Thread Local Storage (alignas 64)" as TLS {
         HeadSlab
+        ActiveSlab
+        BumpCursor
+        Stats(Alloc/Bytes)
+        char_Padding[64_Byte_Enforcement]
     }
 
     [*] --> Idle
 
     state "Allocation Phase" as Alloc {
-        Idle --> CheckFit : Allocate(Size)
+        Idle --> CheckFit : Allocate(Size, Align)
         
         state fit_check <<choice>>
-        CheckFit --> fit_check
-        fit_check --> BumpPointer : Fits in ActiveSlab
-        fit_check --> Overflow : Full
+        CheckFit --> fit_check : (BumpCursor + Size) < ActiveSlab.End ?
         
-        BumpPointer --> ReturnPtr
+        fit_check --> FastPath : Yes (Fits in Slab)
+        fit_check --> SlowPath : No (Overflows)
         
-        state "Overflow Handling (The Reuse Logic)" as Overflow {
-            CheckNext : Check Active->NextSlab
+        FastPath --> BumpPointer : Advance BumpCursor
+        BumpPointer --> ReturnPtr : Cost ~4.93 ns/op
+        
+        state "OverFlowAllocate() Trigger" as SlowPath {
+            CheckNext : Read ActiveSlab->NextSlab
             
             state next_branch <<choice>>
             CheckNext --> next_branch
             
-            next_branch --> Reuse : Next != nullptr (Cached)
-            next_branch --> Grow : Next == nullptr (Empty)
+            next_branch --> Reuse : NextSlab != nullptr
+            next_branch --> Grow : NextSlab == nullptr
             
-            state "Reuse Strategy" as Reuse {
-                SaveLink : Save Next->Next
-                ResetActive : Reset(Active)
-                RestoreLink : Restore Next->Next
-                Advance : Active = Next
+            state "Reuse Pre-Allocated Chain" as Reuse {
+                AdvanceActive : ActiveSlab = NextSlab
+                ResetCursor : BumpCursor = ActiveSlab.Start
             }
             
-            state "Grow Strategy" as Grow {
-                ReqRegistry : Registry->AllocateSlab()
-                Attach : Active->Next = NewSlab
-                AdvanceNew : Active = NewSlab
+            state "Grow Slab Chain" as Grow {
+                LockReg : Acquire g_ContextMutex
+                ReqReg : Registry->AllocateSlab()
+                UnlockReg : Release g_ContextMutex
+                Attach : ActiveSlab->Next = NewSlab
+                AdvanceNew : ActiveSlab = NewSlab
             }
         }
     }
 
-    state "Reset Phase (Soft Reset)" as Reset {
-        UserReset --> IterateChain
-        IterateChain --> RewindSlab : Reset(Current)
-        RewindSlab --> PreserveLink : Keep Next Pointer
-        PreserveLink --> MoveNext
-        MoveNext --> Idle : End of Chain
-    }
-
-    state "Shutdown Phase (Hard Return)" as Shutdown {
-        UserShutdown --> IterateAll
-        IterateAll --> FreeToRegistry : Registry->FreeSlab(Current)
-        FreeToRegistry --> IterateAll
-        IterateAll --> [*] : Chain Empty
+    state "O(1) Rewind Phase" as Reset {
+        UserReset --> ResetHeads
+        ResetHeads --> RebindActive : ActiveSlab = HeadSlab
+        RebindActive --> RebindCursor : BumpCursor = HeadSlab.Start
+        RebindCursor --> Idle : Chain kept alive in memory
     }
