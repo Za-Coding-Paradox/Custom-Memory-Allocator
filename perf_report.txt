@@ -1,0 +1,1055 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 52K of event 'cpu/cycles/P'
+# Event count (approx.): 49348991422
+#
+# Overhead  Command          Shared Object         Symbol                                                                                                                                
+# ........  ...............  ....................  ......................................................................................................................................
+#
+     5.34%  allocator_bench  [kernel.kallsyms]     [k] asm_exc_nmi
+     4.66%  allocator_bench  libc.so.6             [.] cfree
+            |          
+             --4.54%--cfree
+                       |          
+                        --0.57%--0x7fffd79e0000
+                                  0
+
+     3.68%  allocator_bench  allocator_benchmark   [.] BenchReset()
+            |          
+             --2.23%--BenchReset()
+
+     2.96%  allocator_bench  libc.so.6             [.] malloc
+            |          
+             --2.75%--malloc
+                       |          
+                        --0.66%--0x7fffd79e0000
+                                  0
+
+     2.39%  allocator_bench  [kernel.kallsyms]     [k] clear_page_erms
+            |          
+             --2.38%--clear_page_erms
+                       |          
+                        --2.38%--prep_new_page
+                                  get_page_from_freelist
+                                  __alloc_frozen_pages_noprof
+                                  |          
+                                   --2.37%--vma_alloc_folio_noprof
+                                             |          
+                                              --2.20%--folio_prealloc
+                                                        |          
+                                                         --2.20%--do_anonymous_page
+                                                                   handle_mm_fault
+                                                                   do_user_addr_fault
+                                                                   exc_page_fault
+                                                                   asm_exc_page_fault
+                                                                   |          
+                                                                    --2.08%--0x7ffff7996cd2
+                                                                              |          
+                                                                               --2.08%--0x7ffff79970bf
+                                                                                         |          
+                                                                                          --1.64%--BenchSizeSweep()
+
+     2.32%  allocator_bench  [kernel.kallsyms]     [k] __irqentry_text_end
+            |          
+             --2.32%--__irqentry_text_end
+                       |          
+                        --2.19%--0x7ffff7996cd2
+                                  |          
+                                   --2.19%--0x7ffff79970bf
+                                             |          
+                                              --1.77%--BenchSizeSweep()
+
+     2.13%  allocator_bench  allocator_benchmark   [.] BenchSizeSweep()
+            |          
+             --1.68%--BenchSizeSweep()
+
+     1.74%  allocator_bench  libc.so.6             [.] 0x00000000000a3478
+            |
+            ---0x7ffff799447e
+               0x7ffff79956b6
+               |          
+                --1.52%--0x7ffff7995789
+                          |          
+                          |--0.98%--BenchSizeSweep()
+                          |          
+                           --0.54%--BenchThroughput()
+
+     1.68%  allocator_bench  libc.so.6             [.] 0x00000000000a5cd2
+            |          
+             --1.47%--asm_exc_page_fault
+                       |          
+                        --1.42%--0x7ffff7996cd2
+                                  |          
+                                   --1.42%--0x7ffff79970bf
+                                             |          
+                                              --1.11%--BenchSizeSweep()
+
+     1.65%  allocator_bench  allocator_benchmark   [.] Allocator::Utility::AlignForward(void*, unsigned long)
+            |          
+             --1.64%--Allocator::Utility::AlignForward(void*, unsigned long)
+
+     1.40%  allocator_bench  [kernel.kallsyms]     [k] get_page_from_freelist
+            |          
+             --1.37%--get_page_from_freelist
+                       __alloc_frozen_pages_noprof
+                       |          
+                        --1.36%--vma_alloc_folio_noprof
+                                  |          
+                                   --1.36%--folio_prealloc
+                                             do_anonymous_page
+                                             handle_mm_fault
+                                             do_user_addr_fault
+                                             exc_page_fault
+                                             asm_exc_page_fault
+                                             |          
+                                              --1.29%--0x7ffff7996cd2
+                                                        0x7ffff79970bf
+                                                        |          
+                                                         --1.02%--BenchSizeSweep()
+
+     1.20%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTable::Allocate(void*)
+            |
+            ---Allocator::HandleTable::Allocate(void*)
+
+     1.15%  allocator_bench  [kernel.kallsyms]     [k] native_irq_return_iret
+            |          
+             --1.09%--0x7ffff7996cd2
+                       |          
+                        --1.08%--0x7ffff79970bf
+                                  |          
+                                   --0.86%--BenchSizeSweep()
+
+     1.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5329
+            |
+            ---0x7ffff799632d
+               0x7ffff7996fed
+               |          
+                --1.00%--BenchReset()
+
+     0.93%  allocator_bench  libc.so.6             [.] 0x00000000000a4761
+            |
+            ---0x7ffff7995764
+               |          
+                --0.83%--BenchReset()
+
+     0.89%  allocator_bench  [kernel.kallsyms]     [k] error_entry
+            |
+            ---error_entry
+               |          
+                --0.81%--0x7ffff7996cd2
+                          0x7ffff79970bf
+                          |          
+                           --0.65%--BenchSizeSweep()
+
+     0.88%  allocator_bench  libc.so.6             [.] 0x00000000000a52ab
+            |
+            ---0x7ffff79962b1
+               0x7ffff7996fed
+               |          
+                --0.82%--BenchReset()
+
+     0.87%  allocator_bench  libc.so.6             [.] 0x00000000000a5faa
+            |
+            ---0x7ffff7996fae
+               |          
+                --0.66%--BenchReset()
+
+     0.86%  allocator_bench  [kernel.kallsyms]     [k] zap_present_ptes.constprop.0
+            |          
+             --0.84%--zap_present_ptes.constprop.0
+                       unmap_page_range
+                       unmap_vmas
+                       vms_complete_munmap_vmas
+                       do_vmi_align_munmap
+                       __do_sys_brk
+                       do_syscall_64
+                       entry_SYSCALL_64_after_hwframe
+                       brk
+                       __default_morecore
+                       0x7ffff7995121
+                       0x7ffff7995789
+                       |          
+                        --0.67%--BenchSizeSweep()
+
+     0.83%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTable::Free(Allocator::Handle)
+            |
+            ---Allocator::HandleTable::Free(Allocator::Handle)
+               |          
+                --0.83%--0
+                          |          
+                           --0.50%--0x1ff5
+
+     0.82%  allocator_bench  libc.so.6             [.] 0x00000000000a464f
+            |
+            ---0x7ffff7995653
+               |          
+                --0.78%--0x7ffff7995814
+                          |          
+                           --0.72%--BenchReset()
+
+     0.80%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTable::Resolve(Allocator::Handle) const
+            |          
+             --0.80%--Allocator::HandleTable::Resolve(Allocator::Handle) const
+                       |          
+                        --0.78%--0
+
+     0.80%  allocator_bench  libc.so.6             [.] 0x00000000000a4668
+            |
+            ---0x7ffff799566a
+               |          
+                --0.76%--0x7ffff7995814
+                          |          
+                           --0.68%--BenchReset()
+
+     0.79%  allocator_bench  libc.so.6             [.] 0x00000000000a5fd1
+            |
+            ---0x7ffff7996fd6
+               |          
+                --0.74%--BenchReset()
+
+     0.74%  allocator_bench  libc.so.6             [.] 0x00000000000a535d
+            |
+            ---0x7ffff7996360
+               0x7ffff7996fed
+               |          
+                --0.69%--BenchReset()
+
+     0.72%  allocator_bench  libc.so.6             [.] 0x00000000000a4679
+            |
+            ---0x7ffff799567c
+               |          
+                --0.69%--0x7ffff7995814
+                          |          
+                           --0.62%--BenchReset()
+
+     0.69%  allocator_bench  [kernel.kallsyms]     [k] mas_walk
+            |
+            ---mas_walk
+               |          
+                --0.66%--lock_vma_under_rcu
+                          do_user_addr_fault
+                          exc_page_fault
+                          asm_exc_page_fault
+                          |          
+                           --0.64%--0x7ffff7996cd2
+                                     0x7ffff79970bf
+                                     |          
+                                      --0.52%--BenchSizeSweep()
+
+     0.67%  allocator_bench  libc.so.6             [.] 0x00000000000a5279
+            |
+            ---0x7ffff799627a
+               |          
+                --0.63%--BenchReset()
+
+     0.66%  allocator_bench  libc.so.6             [.] 0x00000000000a33c5
+            |
+            ---0x7ffff79943cc
+               0x7ffff79956a0
+               |          
+                --0.62%--0x7ffff7995814
+                          |          
+                           --0.57%--BenchReset()
+
+     0.66%  allocator_bench  libc.so.6             [.] 0x00000000000a55cf
+            |
+            ---0x7ffff79965d2
+               |          
+                --0.66%--0x7ffff7996fed
+                          |          
+                           --0.59%--BenchReset()
+
+     0.63%  allocator_bench  libc.so.6             [.] 0x00000000000a59b6
+            |
+            ---0x7ffff79969b9
+               0x7ffff7996fed
+               |          
+                --0.60%--BenchReset()
+
+     0.63%  allocator_bench  libc.so.6             [.] 0x00000000000a33f7
+            |          
+             --0.62%--0x7ffff79956a0
+                       |          
+                        --0.55%--0x7ffff7995814
+
+     0.62%  allocator_bench  libc.so.6             [.] 0x00000000000a5290
+            |
+            ---0x7ffff7996294
+
+     0.62%  allocator_bench  libc.so.6             [.] 0x00000000000a349f
+            |
+            ---0x7ffff79944a3
+               0x7ffff79956b6
+               |          
+                --0.54%--0x7ffff7995814
+
+     0.61%  allocator_bench  libc.so.6             [.] 0x00000000000a339f
+            |
+            ---0x7ffff79943a3
+               0x7ffff79956a0
+               |          
+                --0.57%--0x7ffff7995814
+                          |          
+                           --0.52%--BenchReset()
+
+     0.60%  allocator_bench  libc.so.6             [.] 0x00000000000a46f8
+            |
+            ---0x7ffff79956fb
+               |          
+                --0.57%--0x7ffff7995814
+                          |          
+                           --0.53%--BenchReset()
+
+     0.60%  allocator_bench  libc.so.6             [.] 0x00000000000a33b3
+            |
+            ---0x7ffff79943b7
+               0x7ffff79956a0
+               |          
+                --0.58%--0x7ffff7995814
+                          |          
+                           --0.51%--BenchReset()
+
+     0.60%  allocator_bench  allocator_benchmark   [.] BenchThroughput()
+     0.60%  allocator_bench  libc.so.6             [.] 0x00000000000a5284
+            |
+            ---0x7ffff7996287
+               0x7ffff7996fed
+               |          
+                --0.54%--BenchReset()
+
+     0.59%  allocator_bench  libc.so.6             [.] 0x00000000000a5342
+            |
+            ---0x7ffff7996345
+               0x7ffff7996fed
+               |          
+                --0.56%--BenchReset()
+
+     0.59%  allocator_bench  libc.so.6             [.] 0x00000000000a5397
+            |
+            ---0x7ffff799639d
+               0x7ffff7996fed
+               |          
+                --0.56%--BenchReset()
+
+     0.59%  allocator_bench  libc.so.6             [.] 0x00000000000a3471
+            |
+            ---0x7ffff7994474
+               0x7ffff79956b6
+
+     0.59%  allocator_bench  libc.so.6             [.] 0x00000000000a4619
+            |
+            ---0x7ffff799561d
+               |          
+                --0.56%--0x7ffff7995814
+                          |          
+                           --0.52%--BenchReset()
+
+     0.58%  allocator_bench  libc.so.6             [.] 0x00000000000a462a
+            |
+            ---0x7ffff799562d
+               |          
+                --0.55%--0x7ffff7995814
+
+     0.56%  allocator_bench  libc.so.6             [.] 0x00000000000a54fd
+            |
+            ---0x7ffff7996500
+               |          
+                --0.56%--0x7ffff7996fed
+                          |          
+                           --0.53%--BenchReset()
+
+     0.56%  allocator_bench  libc.so.6             [.] 0x00000000000a55dc
+            |
+            ---0x7ffff79964f2
+               0x7ffff7996fed
+               |          
+                --0.51%--BenchReset()
+
+     0.54%  allocator_bench  libc.so.6             [.] 0x00000000000a4777
+            |
+            ---0x7ffff7995779
+
+     0.54%  allocator_bench  libc.so.6             [.] 0x00000000000a46c1
+            |
+            ---0x7ffff79956c3
+
+     0.54%  allocator_bench  libc.so.6             [.] 0x00000000000a4637
+            |
+            ---0x7ffff799563b
+               |          
+                --0.52%--0x7ffff7995814
+
+     0.54%  allocator_bench  libc.so.6             [.] 0x00000000000a5305
+            |
+            ---0x7ffff799630c
+               0x7ffff7996fed
+
+     0.53%  allocator_bench  libc.so.6             [.] 0x00000000000a5376
+            |
+            ---0x7ffff799637a
+               0x7ffff7996fed
+
+     0.53%  allocator_bench  libc.so.6             [.] 0x00000000000a468d
+            |
+            ---0x7ffff7995690
+
+     0.53%  allocator_bench  libc.so.6             [.] 0x00000000000a5e8a
+            |
+            ---0x7ffff7996e8f
+               |          
+                --0.52%--0x7ffff7996fed
+
+     0.52%  allocator_bench  [kernel.kallsyms]     [k] handle_mm_fault
+     0.51%  allocator_bench  libc.so.6             [.] 0x00000000000a5eb2
+            |
+            ---0x7ffff7996eb6
+               0x7ffff7996fed
+
+     0.51%  allocator_bench  libc.so.6             [.] 0x00000000000a52f5
+            |
+            ---0x7ffff79962f9
+               |          
+                --0.51%--0x7ffff7996fed
+
+     0.50%  allocator_bench  libc.so.6             [.] 0x00000000000a4804
+     0.49%  allocator_bench  libc.so.6             [.] 0x00000000000a5fe5
+     0.49%  allocator_bench  libc.so.6             [.] 0x00000000000a47f8
+     0.48%  allocator_bench  libc.so.6             [.] 0x00000000000a34ae
+     0.47%  allocator_bench  libc.so.6             [.] 0x00000000000a46ab
+     0.47%  allocator_bench  libc.so.6             [.] 0x00000000000a34be
+     0.47%  allocator_bench  allocator_benchmark   [.] std::thread::_State_impl<std::thread::_Invoker<std::tuple<BenchConcurrency()::$_0::operator()() const::{lambda()#1}> > >::_M_run()
+     0.47%  allocator_bench  libc.so.6             [.] 0x00000000000a602c
+     0.46%  allocator_bench  libc.so.6             [.] 0x00000000000a5fbb
+     0.46%  allocator_bench  libc.so.6             [.] 0x00000000000a4160
+     0.44%  allocator_bench  [kernel.kallsyms]     [k] mod_memcg_lruvec_state
+     0.43%  allocator_bench  libc.so.6             [.] 0x00000000000a480f
+     0.42%  allocator_bench  libc.so.6             [.] 0x00000000000a5ed2
+     0.41%  allocator_bench  [kernel.kallsyms]     [k] do_anonymous_page
+     0.41%  allocator_bench  [kernel.kallsyms]     [k] lru_add
+     0.40%  allocator_bench  libc.so.6             [.] 0x00000000000a47b9
+     0.40%  allocator_bench  libc.so.6             [.] 0x00000000000a5fd6
+     0.40%  allocator_bench  libc.so.6             [.] 0x00000000000a5314
+     0.40%  allocator_bench  allocator_benchmark   [.] Allocator::SlabRegistry::GetSlabDescriptor(void*) const
+     0.39%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init
+     0.39%  allocator_bench  libc.so.6             [.] 0x00000000000a6009
+     0.39%  allocator_bench  libc.so.6             [.] 0x00000000000a5e9b
+     0.38%  allocator_bench  libc.so.6             [.] 0x00000000000a5ec5
+     0.37%  allocator_bench  libc.so.6             [.] 0x00000000000a5ee1
+     0.36%  allocator_bench  [kernel.kallsyms]     [k] try_charge_memcg
+     0.36%  allocator_bench  libc.so.6             [.] 0x00000000000a528b
+     0.36%  allocator_bench  libc.so.6             [.] 0x00000000000a60a3
+     0.36%  allocator_bench  libc.so.6             [.] 0x00000000000a416d
+     0.35%  allocator_bench  libc.so.6             [.] 0x00000000000a5fa4
+     0.35%  allocator_bench  allocator_benchmark   [.] BenchHandleResolution()
+     0.35%  allocator_bench  libc.so.6             [.] 0x00000000000a4197
+     0.34%  allocator_bench  libc.so.6             [.] 0x00000000000a34c6
+     0.34%  allocator_bench  libc.so.6             [.] 0x00000000000a3460
+     0.32%  allocator_bench  allocator_benchmark   [.] BenchChurn()
+     0.32%  allocator_bench  libc.so.6             [.] 0x00000000000a432a
+     0.31%  allocator_bench  allocator_benchmark   [.] BenchGameSim()
+     0.31%  allocator_bench  [kernel.kallsyms]     [k] __lruvec_stat_mod_folio
+     0.31%  allocator_bench  libc.so.6             [.] 0x00000000000a3485
+     0.30%  allocator_bench  libc.so.6             [.] 0x00000000000a5ff8
+     0.30%  allocator_bench  [kernel.kallsyms]     [k] read_hpet
+     0.29%  allocator_bench  libc.so.6             [.] 0x00000000000a4314
+     0.28%  allocator_bench  libc.so.6             [.] 0x00000000000a4765
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a4611
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a55cc
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a5280
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a5be7
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a5611
+     0.27%  allocator_bench  libc.so.6             [.] 0x00000000000a46b6
+     0.26%  allocator_bench  libc.so.6             [.] 0x00000000000a4166
+     0.26%  allocator_bench  libc.so.6             [.] 0x00000000000a5c67
+     0.26%  allocator_bench  libc.so.6             [.] 0x00000000000a469b
+     0.26%  allocator_bench  [kernel.kallsyms]     [k] sync_regs
+     0.26%  allocator_bench  libc.so.6             [.] 0x00000000000a42fc
+     0.25%  allocator_bench  libc.so.6             [.] 0x00000000000a5efb
+     0.24%  allocator_bench  [kernel.kallsyms]     [k] __rcu_read_unlock
+     0.23%  allocator_bench  [kernel.kallsyms]     [k] __page_cache_release.part.0
+     0.23%  allocator_bench  libc.so.6             [.] 0x00000000000a477b
+     0.23%  allocator_bench  [kernel.kallsyms]     [k] do_user_addr_fault
+     0.23%  allocator_bench  [kernel.kallsyms]     [k] vma_alloc_folio_noprof
+     0.22%  allocator_bench  libc.so.6             [.] 0x00000000000b2a10
+     0.22%  allocator_bench  libc.so.6             [.] 0x00000000000a4331
+     0.21%  allocator_bench  libc.so.6             [.] 0x00000000000a5c60
+     0.21%  allocator_bench  libc.so.6             [.] 0x00000000000a481a
+     0.21%  allocator_bench  libc.so.6             [.] 0x00000000000a417e
+     0.21%  allocator_bench  [kernel.kallsyms]     [k] __alloc_frozen_pages_noprof
+     0.21%  allocator_bench  libc.so.6             [.] 0x00000000000a54f9
+     0.21%  allocator_bench  [kernel.kallsyms]     [k] __rcu_read_lock
+     0.20%  allocator_bench  [kernel.kallsyms]     [k] get_mem_cgroup_from_mm
+     0.20%  allocator_bench  libc.so.6             [.] 0x00000000000a3395
+     0.20%  allocator_bench  libc.so.6             [.] 0x00000000000a5fed
+     0.20%  allocator_bench  libc.so.6             [.] 0x00000000000a60b0
+     0.20%  allocator_bench  libc.so.6             [.] 0x00000000000a55ac
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a5ca6
+     0.19%  allocator_bench  [kernel.kallsyms]     [k] folio_add_lru_vma
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a52a2
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a5c6f
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a5c00
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a5289
+     0.19%  allocator_bench  allocator_benchmark   [.] free@plt
+     0.19%  allocator_bench  [kernel.kallsyms]     [k] ___pte_offset_map
+     0.19%  allocator_bench  libc.so.6             [.] 0x00000000000a432c
+     0.18%  allocator_bench  libc.so.6             [.] 0x00000000000a4659
+     0.18%  allocator_bench  libc.so.6             [.] 0x00000000000a52f3
+     0.18%  allocator_bench  [kernel.kallsyms]     [k] __mod_node_page_state
+     0.18%  allocator_bench  libc.so.6             [.] 0x00000000000a4674
+     0.17%  allocator_bench  libc.so.6             [.] 0x00000000000a2ce0
+     0.17%  allocator_bench  libc.so.6             [.] 0x00000000000a4323
+     0.17%  allocator_bench  libc.so.6             [.] 0x00000000000a5cc4
+     0.17%  allocator_bench  libc.so.6             [.] 0x00000000000a4641
+     0.17%  allocator_bench  [kernel.kallsyms]     [k] __mem_cgroup_charge
+     0.17%  allocator_bench  libc.so.6             [.] 0x00000000000a5301
+     0.16%  allocator_bench  libc.so.6             [.] 0x00000000000a5c71
+     0.16%  allocator_bench  libc.so.6             [.] 0x00000000000a5bf1
+     0.16%  allocator_bench  libc.so.6             [.] 0x00000000000a47c0
+     0.16%  allocator_bench  libc.so.6             [.] 0x00000000000a5270
+     0.16%  allocator_bench  [kernel.kallsyms]     [k] free_unref_folios
+     0.16%  allocator_bench  libc.so.6             [.] 0x00000000000a55a4
+     0.16%  allocator_bench  allocator_benchmark   [.] Allocator::PoolStrategy::Free(Allocator::SlabDescriptor&, void*)
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a55a8
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a5310
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a60a2
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a5c76
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a5ef0
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a33bd
+     0.15%  allocator_bench  libc.so.6             [.] 0x00000000000a5c4a
+     0.15%  allocator_bench  [kernel.kallsyms]     [k] folios_put_refs
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a5c93
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a5cb5
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a42f0
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a4630
+     0.14%  allocator_bench  [kernel.kallsyms]     [k] folio_add_new_anon_rmap
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a60c8
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a55d8
+     0.14%  allocator_bench  libc.so.6             [.] 0x00000000000a5cd6
+     0.14%  allocator_bench  allocator_benchmark   [.] malloc@plt
+     0.14%  allocator_bench  [kernel.kallsyms]     [k] css_rstat_updated
+     0.13%  allocator_bench  libc.so.6             [.] 0x00000000000a46f0
+     0.13%  allocator_bench  libc.so.6             [.] 0x00000000000a461d
+     0.13%  allocator_bench  libc.so.6             [.] 0x00000000000a4770
+     0.13%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTableShard::~HandleTableShard()
+     0.12%  allocator_bench  [kernel.kallsyms]     [k] exc_page_fault
+     0.12%  allocator_bench  libc.so.6             [.] 0x00000000000a4694
+     0.12%  allocator_bench  libc.so.6             [.] 0x00000000000a4610
+     0.12%  allocator_bench  libc.so.6             [.] 0x00000000000a4797
+     0.12%  allocator_bench  libc.so.6             [.] 0x00000000000a55b0
+     0.11%  allocator_bench  libc.so.6             [.] 0x00000000000a4680
+     0.11%  allocator_bench  libc.so.6             [.] 0x00000000000a4789
+     0.11%  allocator_bench  libc.so.6             [.] 0x00000000000a4764
+     0.11%  allocator_bench  libc.so.6             [.] 0x00000000000a33d2
+     0.10%  allocator_bench  libc.so.6             [.] 0x00000000000a4616
+     0.10%  allocator_bench  [kernel.kallsyms]     [k] __mod_lruvec_state
+     0.10%  allocator_bench  libc.so.6             [.] 0x00000000000a339c
+     0.10%  allocator_bench  [kernel.kallsyms]     [k] __pte_offset_map_lock
+     0.09%  allocator_bench  [kernel.kallsyms]     [k] free_frozen_page_commit
+     0.09%  allocator_bench  libc.so.6             [.] 0x00000000000a49e1
+     0.09%  allocator_bench  libc.so.6             [.] 0x00000000000a4194
+     0.09%  allocator_bench  libc.so.6             [.] 0x00000000000a34aa
+     0.09%  allocator_bench  libc.so.6             [.] 0x00000000000a42f8
+     0.09%  allocator_bench  [kernel.kallsyms]     [k] irqentry_exit_to_user_mode
+     0.08%  allocator_bench  [kernel.kallsyms]     [k] prep_new_page
+     0.08%  allocator_bench  libc.so.6             [.] 0x00000000000a416c
+     0.08%  allocator_bench  [kernel.kallsyms]     [k] perf_event_mmap
+     0.08%  allocator_bench  [kernel.kallsyms]     [k] lock_vma_under_rcu
+     0.08%  allocator_bench  libc.so.6             [.] 0x00000000000a417a
+     0.08%  allocator_bench  [kernel.kallsyms]     [k] folio_remove_rmap_ptes
+     0.08%  allocator_bench  [kernel.kallsyms]     [k] entry_SYSRETQ_unsafe_stack
+     0.08%  allocator_bench  libc.so.6             [.] 0x00000000000a4790
+     0.08%  allocator_bench  libc.so.6             [.] 0x00000000000a33a9
+     0.08%  allocator_bench  libc.so.6             [.] 0x00000000000b2a14
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000a4328
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000a5c6c
+     0.07%  allocator_bench  allocator_benchmark   [.] BenchFragmentation()
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000a3495
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000a46c6
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000b29bb
+     0.07%  allocator_bench  libc.so.6             [.] 0x00000000000a3390
+     0.07%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init.5
+     0.06%  allocator_bench  libc.so.6             [.] 0x00000000000a46be
+     0.06%  allocator_bench  libc.so.6             [.] 0x00000000000a5c7a
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] free_pages_and_swap_cache
+     0.06%  allocator_bench  libc.so.6             [.] 0x00000000000a34ba
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] folio_prealloc
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] percpu_counter_add_batch
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] policy_nodemask
+     0.06%  allocator_bench  libc.so.6             [.] 0x00000000000a4303
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] free_pcppages_bulk
+     0.06%  allocator_bench  allocator_benchmark   [.] std::thread::_State_impl<std::thread::_Invoker<std::tuple<BenchConcurrency()::$_1::operator()() const::{lambda()#1}> > >::_M_run()
+     0.06%  allocator_bench  libc.so.6             [.] 0x00000000000a4164
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] __mem_cgroup_uncharge_folios
+     0.06%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTable::HandleTable(unsigned int)
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] count_memcg_events
+     0.06%  allocator_bench  [kernel.kallsyms]     [k] vm_normal_page
+     0.05%  allocator_bench  [kernel.kallsyms]     [k] __del_page_from_free_list
+     0.05%  allocator_bench  libc.so.6             [.] 0x00000000000a348d
+     0.05%  allocator_bench  [kernel.kallsyms]     [k] unmap_page_range
+     0.05%  allocator_bench  allocator_benchmark   [.] Allocator::PoolStrategy::Format(Allocator::SlabDescriptor&, unsigned long)
+     0.05%  allocator_bench  [kernel.kallsyms]     [k] pte_offset_map_rw_nolock
+     0.05%  allocator_bench  libc.so.6             [.] 0x00000000000a5c4d
+     0.05%  allocator_bench  [kernel.kallsyms]     [k] folio_mapping
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a34b2
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a34a3
+     0.04%  allocator_bench  [kernel.kallsyms]     [k] syscall_return_via_sysret
+     0.04%  allocator_bench  [kernel.kallsyms]     [k] entry_SYSCALL_64
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a5c82
+     0.04%  allocator_bench  [kernel.kallsyms]     [k] update_curr
+     0.04%  allocator_bench  [kernel.kallsyms]     [k] __mod_zone_page_state
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a4330
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a346e
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a33f6
+     0.04%  allocator_bench  [kernel.kallsyms]     [k] __folio_throttle_swaprate
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a347e
+     0.04%  allocator_bench  libc.so.6             [.] 0x00000000000a60c4
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] pud_val
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a4310
+     0.03%  allocator_bench  allocator_benchmark   [.] BenchCacheCoherency()
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a34c2
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5c8f
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] thp_vma_allowable_orders.constprop.1
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a609e
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5cc1
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a4180
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a4784
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_unlock
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a46ba
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5c63
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a4769
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a55a7
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a4168
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5cb1
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a46b1
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_lock_irqsave
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] pfn_pte
+     0.03%  allocator_bench  [kernel.kallsyms]     [k] mas_preallocate
+     0.03%  allocator_bench  libc.so.6             [.] 0x00000000000a5c7e
+     0.03%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init.15
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a46c3
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a60cd
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a5ca3
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a33b7
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a33c1
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] security_vm_enough_memory_mm
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] mas_wr_store_entry
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a42f4
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a4161
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] pte_mkwrite
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] __tlb_remove_folio_pages
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] blk_cgroup_congested
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a60bf
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a4814
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] task_tick_fair
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] asm_exc_page_fault
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] perf_event_mmap_output
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000b2a1e
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a46a8
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] mas_store_prealloc
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_lock
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a41ae
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] memset_orig
+     0.02%  allocator_bench  allocator_benchmark   [.] Allocator::SlabRegistry::AllocateSlabBatch(unsigned long, Allocator::SlabDescriptor**)
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] native_write_msr
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] _find_first_bit
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] page_counter_try_charge
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] __update_load_avg_cfs_rq
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] vma_merge_new_range
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] vma_prepare
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] irqentry_enter
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a5c03
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] __do_sys_brk
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a55ae
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] mas_prev_slot
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] p4d_offset
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] pvclock_gtod_notify
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] sched_tick
+     0.02%  allocator_bench  libc.so.6             [.] 0x00000000000a4798
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] commit_merge
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] page_counter_uncharge
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_trylock
+     0.02%  allocator_bench  [kernel.kallsyms]     [k] do_syscall_64
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] update_load_avg.constprop.0
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4493
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __vmf_anon_prepare
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a52dd
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::LinearStrategyModule<Allocator::LevelLoad>::OverFlowAllocate(unsigned long, unsigned long)
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __build_id_parse.isra.0
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] rcu_sched_clock_irq
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a3480
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] arch_check_zapped_pte
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] do_brk_flags
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] vma_complete
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4171
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] sugov_update_single_freq
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5cce
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] sized_strscpy
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mas_next_slot
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] native_sched_clock
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] static_key_count
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __vma_start_write
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] rwsem_down_write_slowpath
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a60a5
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4327
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::LinearStrategyModule<Allocator::FrameLoad>::OverFlowAllocate(unsigned long, unsigned long)
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a52be
+     0.01%  allocator_bench  allocator_benchmark   [.] _ZN9Allocator20LinearStrategyModuleINS_9FrameLoadEE5ResetEvQntsrT_12IsRewindable
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a33ad
+     0.01%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init.5
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] error_return
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] down_write_killable
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __update_load_avg_se
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4697
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] perf_adjust_freq_unthr_context
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] irqentry_enter_from_user_mode
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTable::Clear()
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] init_multi_vma_prep
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] anon_vma_interval_tree_remove
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] entry_SYSCALL_64_safe_stack
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] timerqueue_add
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a601e
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4818
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a41c8
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a60a6
+     0.01%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init.20
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] uncharge_batch
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::SlabRegistry::FreeSlab(Allocator::SlabDescriptor*)
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mas_find
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] native_read_msr
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a418d
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mas_leaf_max_gap
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4782
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4793
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a55b1
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] arch_get_unmapped_area_topdown
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] may_expand_vm
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a530c
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::HandleTableShard::GrowCapacity()
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a432e
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a3391
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mas_wr_walk
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] pgd_none
+     0.01%  allocator_bench  libc.so.6             [.] brk
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a467c
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000b2a27
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mem_cgroup_from_task
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] account_user_time
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a34b6
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] rb_erase
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] native_set_pte
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5620
+     0.01%  allocator_bench  allocator_benchmark   [.] Allocator::LinearStrategy::Reset(Allocator::SlabDescriptor&)
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4676
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4802
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] change_protection_range
+     0.01%  allocator_bench  allocator_benchmark   [.] std::thread::_State_impl<std::thread::_Invoker<std::tuple<BenchFalseSharing()::$_2> > >::_M_run()
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5ffc
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4362
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] psi_task_switch
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] rwsem_spin_on_owner
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] do_mprotect_pkey
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a2ce9
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a416a
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000b2a19
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] kthread_blkcg
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] dl_server_update
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __pte
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __timekeeping_advance
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5ebb
+     0.01%  allocator_bench  allocator_benchmark   [.] __cxx_global_var_init.10
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4662
+     0.01%  allocator_bench  libc.so.6             [.] __sbrk
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] free_tail_page_prepare
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] enqueue_hrtimer
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] irq_enter_rcu
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4645
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a60b3
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] alloc_pages_noprof
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] sched_balance_trigger
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __nr_to_section
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] strnlen
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a46f4
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __sysvec_apic_timer_interrupt
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] __get_unmapped_area
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5ed9
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4618
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4670
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5c21
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] sched_clock_cpu.part.0
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4684
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a5ea4
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] is_mergeable_anon_vma
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] hrtimer_interrupt
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] account_process_tick
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] rb_next
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] update_rq_clock
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] cap_vm_enough_memory
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] vma_adjust_trans_huge
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a4809
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a41a0
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] native_apic_msr_eoi
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] sched_balance_rq
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] entry_SYSCALL_64_after_hwframe
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a46ae
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] up_write
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] mprotect_fixup
+     0.01%  allocator_bench  libc.so.6             [.] 0x00000000000a47fc
+     0.01%  allocator_bench  [kernel.kallsyms]     [k] perf_event_alloc
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5d49
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a352a
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tick_program_event
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a34a7
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] perf_event_task_tick
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] cap_mmap_addr
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tick_nohz_get_idle_calls_cpu
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tlb_remove_table_rcu
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sched_clock_tick
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a52f0
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5bdf
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] folio_lruvec_lock_irqsave
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a33ce
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sched_clock_noinstr
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] bpf_lsm_vm_enough_memory
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] account_freepages
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] ktime_get
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mas_wr_spanning_store
+     0.00%  allocator_bench  libc.so.6             [.] pthread_mutex_lock
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000b2a23
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] run_posix_cpu_timers
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a54f5
+     0.00%  allocator_bench  allocator_benchmark   [.] Allocator::SlabRegistry::AllocateSlab()
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] account_system_time
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4634
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] x64_sys_call
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5bdc
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5be2
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4655
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mas_spanning_rebalance
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __rb_insert_augmented
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4621
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55aa
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] userfaultfd_unmap_complete
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] update_fast_timekeeper
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] strlen
+     0.00%  allocator_bench  libc.so.6             [.] 0x000000000009b950
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a528f
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5fdc
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x64_sys_clock_gettime
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a487e
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a481c
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x86_indirect_thunk_rax
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] kfree
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a52fd
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a3509
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5287
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] security_mmap_addr
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a463b
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a533b
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] wake_q_add
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5fa0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] try_to_wake_up
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a527a
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a59b2
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] vma_modify_flags
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4690
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] cpuset_fork
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] kvfree_call_rcu
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5eec
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] vma_modify
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a41cd
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] vma_expand
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tlb_gather_mmu
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5ef6
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a59fc
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5e8f
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a3517
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5de3
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5eff
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5ee8
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5e97
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mas_ascend
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a59a8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x86_indirect_thunk_rcx
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] place_entity
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] fput
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5e84
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sugov_get_util
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a46c5
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5dab
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5de8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __check_object_size
+     0.00%  allocator_bench  allocator_benchmark   [.] operator delete(void*, unsigned long)@plt
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] pmd_install
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a52ca
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5eb6
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tick_nohz_handler
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a346b
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a536d
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] raw_notifier_call_chain
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] profile_tick
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55ca
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a48e0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mas_update_gap.part.0
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a52f9
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x86_indirect_thunk_r12
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] check_preempt_wakeup_fair
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5bf9
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5624
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] wakeup_preempt
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a527d
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5294
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] rb_insert_color
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55be
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] irqentry_exit
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5cae
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5c1c
+     0.00%  allocator_bench  allocator_benchmark   [.] pthread_mutex_lock@plt
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sched_balance_update_blocked_averages
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] update_process_times
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __free_pages
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a560b
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a538e
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a462d
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4774
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5366
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sugov_hold_freq
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __memcg_kmem_uncharge_page
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __free_frozen_pages
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000b29a8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] get_free_pages_noprof
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] update_other_load_avgs
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a60ba
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a34c7
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a3398
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] reweight_entity
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4e7b
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] irqtime_account_irq
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5cf2
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] notifier_call_chain.constprop.0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] khugepaged_enter_vma
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5353
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] raise_softirq
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5cb9
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __split_vma
+     0.00%  allocator_bench  libc.so.6             [.] 0x0000000000059d60
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] clockevents_program_event
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] swake_up_one
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] free_pgtables
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55d5
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] hrtimer_forward
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a2ced
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a49dd
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __vm_enough_memory
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __schedule
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mas_mab_cp
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a529e
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] pte_alloc_one
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] rcu_core
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] update_vsyscall
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a3474
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] _raw_spin_lock_irq
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5c47
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] security_task_free
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5326
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a54f2
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a48f8
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55c8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] early_xen_iret_patch
+     0.00%  allocator_bench  libstdc++.so.6.0.34   [.] 0x00000000000e55a4
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] bpf_lsm_file_mprotect
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __kmalloc_cache_node_noprof
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] lapic_next_deadline
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5d7f
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a2ce3
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] resched_curr_lazy
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a46fb
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] cpuacct_account_field
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] restore_regs_and_return_to_kernel
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a47bc
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] mod_memcg_state
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] pte_val
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x86_indirect_thunk_rbp
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] vm_stat_account
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tick_do_update_jiffies64.part.0
+     0.00%  allocator_bench  libc.so.6             [.] _IO_file_xsputn
+     0.00%  allocator_bench  libc.so.6             [.] 0x000000000005c84e
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] rcu_do_batch
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a5461
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __hrtimer_run_queues
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __kmem_cache_free_bulk.part.0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __put_user_8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __slab_free
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] alloc_pages_bulk_noprof
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] build_id_parse_nofault
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] free_ctx
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] hrtimer_setup
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] idr_get_free
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] kernel_clone
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] kmem_cache_alloc_node_noprof
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] madvise_vma_behavior
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sched_mm_cid_before_execve
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] schedule
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] sysvec_apic_timer_interrupt
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tlb_flush_mmu_free
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] update_cfs_group
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] walk_pgd_range
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] x86_pmu_hw_config
+     0.00%  allocator_bench  libc.so.6             [.] 0x000000000009b93a
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a55f3
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] down_write
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a4760
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] tlb_finish_mmu
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] arch_scale_freq_tick
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] flush_tlb_mm_range
+     0.00%  allocator_bench  libstdc++.so.6.0.34   [.] std::chrono::_V2::steady_clock::now()
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __x64_sys_futex
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] userfaultfd_remove
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] ktime_get_update_offsets_now
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] task_active_pid_ns
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __srcu_read_unlock
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] list_add_event
+     0.00%  allocator_bench  libc.so.6             [.] clock_gettime
+     0.00%  allocator_bench  libc.so.6             [.] 0x00000000000a41b8
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] psi_group_change
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] alloc_pid
+     0.00%  allocator_bench  libc.so.6             [.] 0x0000000000096b42
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __switch_to_asm
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] ___pte_free_tlb
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] acct_collect
+     0.00%  allocator_bench  allocator_benchmark   [.] std::thread::_State_impl<std::thread::_Invoker<std::tuple<BenchFalseSharing()::$_1> > >::_M_run()
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] intel_pmu_hw_config.part.0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] restore_fpregs_from_fpstate
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] x86_add_exclusive
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] unmapped_area_topdown
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] x86_pmu_event_init
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] allocate_fake_cpuc
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] inherit_task_group.isra.0
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] do_mmap
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __futex_hash
+     0.00%  allocator_bench  libc.so.6             [.] pthread_create
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __kmalloc_cache_noprof
+     0.00%  allocator_bench  allocator_benchmark   [.] Allocator::SlabRegistry::InitializeArena()
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] __queue_work
+     0.00%  allocator_bench  ld-linux-x86-64.so.2  [.] 0x000000000000b056
+     0.00%  allocator_bench  ld-linux-x86-64.so.2  [.] 0x000000000000b940
+     0.00%  allocator_bench  ld-linux-x86-64.so.2  [.] 0x000000000000b0ae
+     0.00%  allocator_bench  ld-linux-x86-64.so.2  [.] 0x000000000002699e
+     0.00%  taskset          libc.so.6             [.] 0x00000000000eba50
+     0.00%  taskset          [kernel.kallsyms]     [k] lru_add
+     0.00%  taskset          ld-linux-x86-64.so.2  [.] 0x000000000000b95c
+     0.00%  taskset          [kernel.kallsyms]     [k] syscall_return_via_sysret
+     0.00%  allocator_bench  [kernel.kallsyms]     [k] vma_interval_tree_augment_rotate
+     0.00%  taskset          ld-linux-x86-64.so.2  [.] 0x0000000000008030
+     0.00%  taskset          [kernel.kallsyms]     [k] __anon_vma_prepare
+     0.00%  taskset          [kernel.kallsyms]     [k] kmem_cache_prefill_sheaf
+     0.00%  taskset          [kernel.kallsyms]     [k] sched_balance_find_dst_group
+     0.00%  taskset          [kernel.kallsyms]     [k] zap_present_ptes.constprop.0
+
+
+#
+# (Tip: Show current config key-value pairs: perf config --list)
+#

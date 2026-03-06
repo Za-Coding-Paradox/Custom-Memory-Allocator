@@ -1,0 +1,96 @@
+
+╔══════════════════════════════════════════════════════════════╗
+║  CUSTOM ALLOCATOR vs malloc  —  Full Benchmark Suite         ║
+║  Arena: 512MB | Slab: 64KB | Median of 7 runs per bench      ║
+╚══════════════════════════════════════════════════════════════╝
+
+  I.    Throughput...
+  [TRACE] === BenchThroughput start ===
+  [TRACE] Linear 64B ─────────────────────────────────────────────────
+  [TRACE] Pool 64B alloc+free ────────────────────────────────────────
+  II.   Churn...
+  [TRACE] === BenchChurn start ===
+  [TRACE] 128B ───────────────────────────────────────────────────────
+  III.  Size sweep...
+  [TRACE] === BenchSizeSweep start ===
+  IV.   Cache coherency...
+  [TRACE] === BenchCacheCoherency start ===
+  V.    Fragmentation...
+  [TRACE] === BenchFragmentation start ===
+  [TRACE] Same-size 128B ─────────────────────────────────────────────
+  VI.   Concurrency...
+  [TRACE] === BenchConcurrency start ===
+  VII.  Reset / Rewind...
+  [TRACE] === BenchReset start ===
+  [TRACE] FrameLoad: bump alloc N + Reset ────────────────────────────
+  VIII. Handle resolution...
+  [TRACE] === BenchHandleResolution start ===
+  IX.   Game simulation...
+  [TRACE] === BenchGameSim start ===
+  X.    False-sharing probe...
+  [TRACE] === BenchFalseSharing start ===
+
+[X. False-Sharing Probe — 16 threads, 100K bump allocs each]
+  Custom: avg=180µs  min=179µs  max=191µs  spread=6.7%
+  malloc: avg=57740µs  min=32552µs  max=79490µs  spread=81.3%
+  >> PASS: single cluster, spread=6.7%. TLS padding correct.
+
+-------------------------------------------------------------------------------------------------------------------
+DOMAIN              BENCHMARK                         CUSTOM       MALLOC       SPEEDUP  VERDICT   NOTES
+-------------------------------------------------------------------------------------------------------------------
+I. Throughput       Linear alloc 64B                  4.61 ns/op   61.23 ns/op  13.29x   FASTER    no free, O(1) bump
+I. Throughput       Linear alloc 512B                 4.55 ns/op   257.54 ns/op 56.57x   FASTER    no free, O(1) bump
+I. Throughput       Pool alloc+free 64B               23.70 ns/op  30.50 ns/op  1.29x    FASTER    full cycle, CAS freelist
+I. Throughput       Pool alloc+free 256B              37.52 ns/op  78.36 ns/op  2.09x    FASTER    full cycle, CAS freelist
+
+II. Churn           Pool 128B 50% churn               25.07 ns/op  7.52 ns/op   0.30x    SLOWER    checkerboard free/realloc
+II. Churn           Pool 32B 50% churn                23.52 ns/op  3.32 ns/op   0.14x    SLOWER    small bucket recycling
+
+III. Size Sweep     Linear 16B                        4.68 ns/op   44.25 ns/op  9.46x    FASTER    N=4194304
+III. Size Sweep     Linear 32B                        4.67 ns/op   49.55 ns/op  10.60x   FASTER    N=2097152
+III. Size Sweep     Linear 64B                        4.68 ns/op   61.12 ns/op  13.05x   FASTER    N=1048576
+III. Size Sweep     Linear 128B                       4.69 ns/op   89.74 ns/op  19.15x   FASTER    N=524288
+III. Size Sweep     Linear 256B                       4.71 ns/op   154.86 ns/op 32.89x   FASTER    N=262144
+III. Size Sweep     Linear 512B                       4.78 ns/op   254.14 ns/op 53.12x   FASTER    N=131072
+III. Size Sweep     Linear 1024B                      5.18 ns/op   437.91 ns/op 84.48x   FASTER    N=65536
+III. Size Sweep     Linear 2048B                      5.11 ns/op   813.48 ns/op 159.29x  FASTER    N=32768
+III. Size Sweep     Linear 4096B                      5.59 ns/op   1515.13 ns/op271.11x  FASTER    N=16384
+III. Size Sweep     Linear 8192B                      5.81 ns/op   1493.08 ns/op256.79x  FASTER    N=8192
+III. Size Sweep     Linear 16384B                     6.99 ns/op   1428.88 ns/op204.39x  FASTER    N=4096
+
+IV. Cache           Seq scan 64B x16K                 2.00 ns/op   2.00 ns/op   1.00x    PAR       contiguous slab vs scattered heap
+IV. Cache           Strided scan stride=8             2.66 ns/op   2.65 ns/op   0.99x    PAR       probes TLB + prefetch distance
+IV. Cache           Pool resolve+read 64B             3.43 ns/op   1.89 ns/op   0.55x    SLOWER    handle table seqlock overhead
+
+V. Fragmentation    Same-size 128B checker            27.31 ns/op  4.78 ns/op   0.18x    SLOWER    50% free+realloc per cycle
+V. Fragmentation    Mixed 32B+256B interleaved        26.86 ns/op  5.17 ns/op   0.19x    SLOWER    separate buckets vs heap coalesce
+
+VI. Concurrency     Pool 128B 2 threads               27.66 ns/op  24.89 ns/op  0.90x    SLOWER    2 threads x 20000 ops
+VI. Concurrency     Pool 128B 4 threads               27.61 ns/op  25.01 ns/op  0.91x    PAR       4 threads x 20000 ops
+VI. Concurrency     Pool 128B 8 threads               28.32 ns/op  27.20 ns/op  0.96x    PAR       8 threads x 20000 ops
+VI. Concurrency     Pool 128B 16 threads              28.90 ns/op  25.95 ns/op  0.90x    SLOWER    16 threads x 20000 ops
+
+VII. Reset          Frame alloc+Reset 1K frames       4.43 ns/op   46.78 ns/op  10.55x   FASTER    Reset=O(1) vs N x free()
+VII. Reset          LevelLoad rewind 5K/frame         4.89 ns/op   47.26 ns/op  9.67x    FASTER    marker save+rewind vs N x free()
+
+VIII. Handles       Handle resolve 2M ops             4.18 ns/op   1.58 ns/op   0.38x    SLOWER    vs raw ptr deref
+
+IX. Game Sim        2K frame mixed loop               7.25 ns/op   39.40 ns/op  5.43x    FASTER    scratch+pool+reset
+
+X. False-Sharing    TLS isolation 16T                 4.50 ns/op   1443.50 ns/op320.78x  FASTER    custom spread=7%  malloc spread=81%
+-------------------------------------------------------------------------------------------------------------------
+
+
+ Performance counter stats for 'taskset -c 0 ./build/release/allocator_benchmark':
+
+    45,954,450,470      cycles                                                                
+    89,782,400,161      instructions                                                          
+       130,694,296      cache-misses                                                          
+        23,838,560      LLC-load-misses                                                       
+
+      11.935555560 seconds time elapsed
+
+       9.887910000 seconds user
+       2.039949000 seconds sys
+
+
