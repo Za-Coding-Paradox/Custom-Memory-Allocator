@@ -584,7 +584,7 @@ CPU governor: performance. ASLR disabled (`/proc/sys/kernel/randomize_va_space =
 
 The pool allocator's churn penalty (6x slower than malloc's tcache under 50%
 recycle rate) is the only structural regression. The root cause and remediation
-plan are documented in [docs/PERFORMANCE_REPORT.md](docs/PERFORMANCE_REPORT.md).
+plan are documented in [documentation/PERFORMANCE_REPORT.md](documentation/PERFORMANCE_REPORT.md).
 
 **Hardware counters** (`perf stat`, pinned to core 0, full benchmark run):
 
@@ -607,7 +607,7 @@ is approximately **4.5%** of total program instructions.
 For the full micro-architectural analysis — including per-function cycle
 attribution, branch mispredict rates, heaptrack allocation lifecycle, and
 latency distribution methodology — see
-[docs/PERFORMANCE_REPORT.md](docs/PERFORMANCE_REPORT.md).
+[documentation/PERFORMANCE_REPORT.md](documentation/PERFORMANCE_REPORT.md).
 
 ---
 
@@ -1002,7 +1002,7 @@ to `((void)0)` under `NDEBUG`.
 
 ## License
 
-This project is released under the MIT License. See [LICENSE](LICENSE) for the
+This project is released under the MIT License. See [LICENSE.md](LICENSE) for the
 full text. The allocator, benchmark suite, and test suite are all covered by
 this license. Third-party dependencies (GoogleTest) retain their own licenses
 and are not bundled — they are located via `find_package` at build time.eow
